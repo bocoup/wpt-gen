@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib.resources
 import re
 from pathlib import Path
 from typing import Any
@@ -83,7 +84,7 @@ async def generate_test_with_adk(
   )
   tools.append(FunctionTool(func=report_generation_complete))
 
-  skill_dir = Path(__file__).parent.parent.parent / '.agents' / 'skills' / 'wpt-generator'
+  skill_dir = Path(str(importlib.resources.files('wptgen') / 'skills' / 'wpt-generator'))
   if skill_dir.is_dir():
     try:
       wpt_generator_skill = load_skill_from_dir(skill_dir)

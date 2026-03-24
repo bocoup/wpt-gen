@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import importlib.resources
 import json
 from pathlib import Path
 
@@ -53,7 +54,7 @@ class WPTGenEngine:
     self.ui = ui
     self.llm = get_llm_client(config)
 
-    template_dir = Path(__file__).parent.joinpath('templates')
+    template_dir = Path(str(importlib.resources.files('wptgen') / 'templates'))
     self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
 
     assert self.config.cache_path is not None, 'cache_path must be set in configuration'
