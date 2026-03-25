@@ -99,7 +99,10 @@ async def run_requirements_extraction(
     )
     extraction_system_prompt = jinja_env.get_template(
       'requirements_extraction_system.jinja'
-    ).render()
+    ).render(
+      has_mdn=bool(context.mdn_contents),
+      has_explainer=bool(context.explainer_contents),
+    )
 
     await confirm_prompts(
       [(extraction_prompt, 'Requirements Extraction')],
@@ -175,6 +178,8 @@ async def run_requirements_extraction_categorized(
       ).render(
         category_name=category_name,
         category_description=category_description,
+        has_mdn=bool(context.mdn_contents),
+        has_explainer=bool(context.explainer_contents),
       )
       category_prompts.append(extraction_prompt)
       category_system_prompts.append(extraction_system_prompt)
@@ -311,7 +316,10 @@ async def run_requirements_extraction_iterative(
       )
       extraction_system_prompt = jinja_env.get_template(
         'requirements_extraction_iterative_system.jinja'
-      ).render()
+      ).render(
+        has_mdn=bool(context.mdn_contents),
+        has_explainer=bool(context.explainer_contents),
+      )
 
       if iteration == 1:
         await confirm_prompts(
