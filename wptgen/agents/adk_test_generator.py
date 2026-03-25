@@ -28,7 +28,7 @@ from jinja2 import Environment
 from wptgen.agents.provider import setup_adk_environment
 from wptgen.agents.streaming import ADKStreamManager
 from wptgen.agents.tools import _validate_safe_path, create_agent_tools
-from wptgen.config import Config
+from wptgen.config import SKILLS_DIR, Config
 from wptgen.models import TestType, WorkflowContext
 from wptgen.ui import UIProvider
 
@@ -83,7 +83,7 @@ async def generate_test_with_adk(
   )
   tools.append(FunctionTool(func=report_generation_complete))
 
-  skill_dir = Path(__file__).parent.parent.parent / '.agents' / 'skills' / 'wpt-generator'
+  skill_dir = SKILLS_DIR / 'wpt-generator'
   if skill_dir.is_dir():
     try:
       wpt_generator_skill = load_skill_from_dir(skill_dir)
