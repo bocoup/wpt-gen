@@ -25,6 +25,7 @@ from typing import Any
 from google.adk.tools.function_tool import FunctionTool
 
 from wptgen.context import fetch_and_extract_text, find_feature_tests
+from wptgen.ui import UIProvider
 
 BINARY_EXTENSIONS = {
   '.png',
@@ -124,7 +125,9 @@ def _validate_safe_path(target_path: Path, wpt_root: Path) -> Path:
   return resolved_target
 
 
-def create_agent_tools(wpt_path: Path, browser: str, channel: str) -> list[FunctionTool]:
+def create_agent_tools(
+  wpt_path: Path, ui: UIProvider, browser: str, channel: str
+) -> list[FunctionTool]:
   """Creates a suite of strictly validated tools for the ADK agent.
 
   All file operations performed by these tools are guaranteed to be restricted
@@ -133,6 +136,9 @@ def create_agent_tools(wpt_path: Path, browser: str, channel: str) -> list[Funct
 
   Args:
       wpt_path: The root directory of the WPT repository.
+      ui: The UIProvider instance for printing output to the terminal.
+      browser: The browser to use for testing.
+      channel: The browser channel.
 
   Returns:
       A list of ADK `FunctionTool` objects.
@@ -353,8 +359,8 @@ def create_agent_tools(wpt_path: Path, browser: str, channel: str) -> list[Funct
         file_path: The path to the test file to run.
 
     Returns:
-        A dictionary containing the 'status' and any 'failing_tests' messages,
-        or 'success' if all assertions pass.
+        A dictionary containing the 'status', any 'failing_tests' messages,
+        and the full 'output' logs from the test runner.
     """
     try:
       target = _validate_safe_path(Path(file_path), wpt_path)
@@ -368,7 +374,17 @@ def create_agent_tools(wpt_path: Path, browser: str, channel: str) -> list[Funct
 
       try:
         # Use headless browser for testing
-        cmd = ['./wpt', 'run', '--channel', channel, '--log-raw', log_path, browser, rel_path]
+        cmd = [
+          './wpt',
+          'run',
+          '--channel',
+          channel,
+          '--headless',
+          '--log-mach',
+          log_path,
+          browser,
+          rel_path,
+        ]
 
         try:
           result = subprocess.run(
@@ -379,23 +395,43 @@ def create_agent_tools(wpt_path: Path, browser: str, channel: str) -> list[Funct
             timeout=WPT_RUN_TIMEOUT_SECONDS,
           )
         except subprocess.TimeoutExpired as e:
+          partial_stdout = (
+            e.stdout.decode('utf-8') if isinstance(e.stdout, bytes) else (e.stdout or '')
+          )
+          partial_stderr = (
+            e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else (e.stderr or '')
+          )
+          if partial_stdout:
+            ui.stream_text(partial_stdout)
+          if partial_stderr:
+            ui.stream_text(partial_stderr)
+          output_log = f'{partial_stdout}\n{partial_stderr}'.strip()
           return {
             'status': 'error',
             'error': f'Command timed out after {e.timeout} seconds.',
+            'output': output_log,
           }
 
+        if result.stdout:
+          ui.stream_text(result.stdout)
+        if result.stderr:
+          ui.stream_text(result.stderr)
+
+        output_log = f'{result.stdout}\n{result.stderr}'.strip()
+
         if result.returncode == 0:
-          return {'status': 'success', 'message': 'All assertions passed.'}
+          return {'status': 'success', 'message': 'All assertions passed.', 'output': output_log}
 
         failing_tests = _parse_test_results(log_path)
 
         if not failing_tests:
           return {
             'status': 'error',
-            'error': f'Test runner crashed or failed. Output: {result.stderr.strip()}',
+            'error': 'Test runner crashed or failed. See output.',
+            'output': output_log,
           }
 
-        return {'status': 'failed', 'failing_tests': failing_tests}
+        return {'status': 'failed', 'failing_tests': failing_tests, 'output': output_log}
       finally:
         if os.path.exists(log_path):
           os.remove(log_path)
