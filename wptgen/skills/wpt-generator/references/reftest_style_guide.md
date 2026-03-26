@@ -2,9 +2,18 @@ Reftests (reference tests) are one of the primary tools in Web Platform Tests (W
 
 This guide provides a comprehensive overview of best practices for writing high-quality, maintainable, and robust reftests.
 
+### When to Use Reftests: The CSS Counter Exception
+While `testharness.js` is generally preferred for testing parsed or computed CSS values, **you MUST use Reftests when verifying the mathematical evaluation or visual output of CSS counters** (e.g., `counter-set`, `counter-increment`, `counter-reset`).
+*   **Why?** The JavaScript API `getComputedStyle(element, '::before').content` is unreliable for extracting the evaluated integer string of a counter across all major browser engines. Many engines will incorrectly return the raw functional value (e.g., `"counter(c)"`) instead of the computed number (e.g., `"1"`).
+*   **The Solution:** A Reftest avoids JavaScript entirely by comparing the visual output of the CSS counter against a reference file that uses hardcoded, statically defined text.
+
 ## 1. Anatomy of a Reftest
 
-A reftest consists of at least two files: the test file and the reference file.
+A reftest requires at least two files: the test file and the reference file. 
+
+**CRITICAL RULE FOR AI GENERATION:** Before writing a new reference file, you MUST rigorously search the target directory (and its `reference/` subdirectories) for existing reference files that match your expected output (e.g., `ref-filled-green-100px-square.xht`). 
+- **If a suitable reference exists:** Use a `<link rel="match">` tag pointing to that existing file. Do NOT generate a duplicate reference file.
+- **If NO suitable reference exists:** You MUST generate BOTH your new test file AND a new reference file (e.g., `my-test-ref.html`). Never create a `<link rel="match" href="ref.html">` tag without ensuring `ref.html` actually exists!
 
 ### The Test File
 The test file employs the technology being tested. It must include a `<link>` element that points to the reference file.
@@ -47,31 +56,64 @@ The reference file describes the *expected* output. **Crucially, it should not u
 - **Path Lengths**: Keep paths under 150 characters relative to the test root to avoid Windows limitations.
 - **CSS Uniqueness**: In the `css/` directory, filenames must be unique across the entire `css/` tree.
 
-## 3. The Golden Rule of References
+## 3. Reusing Reference Files (CRITICAL)
+
+Before creating a new reference file, **you MUST check if an existing reference file can be reused**. Reusing references is highly preferred because it reduces repository bloat and speeds up automated test runners.
+
+- Look in the current directory and any `reference/`, `references/`, or `support/` subdirectories.
+- Look for standard WPT shared references (e.g., `../reference/ref-filled-green-100px-square.xht`).
+- If an existing file produces the exact same visual rendering (e.g., a simple green square or a blank white page), link to it using `<link rel="match" href="...">` instead of creating a new `-ref.html` file.
+
+**The Cleanliness Boundary:** While reusing reference files is strongly encouraged, you must balance this against test cleanliness. If reusing an older, multi-element reference file requires you to write an overly "hacky", mangled, or excessively complex DOM in your test file just to perfectly align with its output, **do not reuse it**. A clean, readable, and focused test file takes priority over reference reuse. If the tradeoff is severe, simply spawn a new, slightly altered reference file to keep the individual tests clean.
+
+### 3.1 Designing Tests for Reference Reuse
+
+**CRITICAL RULE:** Design your test's output to match an existing reference, rather than designing a bespoke reference to match your test's output.
+
+When testing multiple independent permutations (e.g., verifying that `display: none` and `content: none` both have no effect on a property), **do not** generate independent, sequential visual outputs for each permutation (e.g., outputting `1`, `1`, `1` in a list). This anti-pattern forces the creation of a bespoke, duplicate reference file.
+
+Instead, consolidate the permutations sequentially into a single layout that evaluates to a standard output (e.g., a final integer like `7`, or a single green square). Let each permutation attempt its operation; if they behave correctly, the final evaluated state should match an already existing reference (like `counter-7-ref.html` or a generic green square).
+
+## 4. The Golden Rule of References
 
 **References must be simple.** If you are testing CSS Grid, your reference should use absolute positioning, floats, or simple block layout to achieve the same visual result. This ensures that a failure in the reference doesn't cause a false positive or negative in the test.
 
-## 4. Visual Patterns for Success and Failure
+## 5. Visual Patterns for Success and Failure
 
 Tests should be "self-describing" so a human can easily verify them.
+
+### 5.1 Pruning Redundant Scaffolding (Crucial for Blueprints)
+When generating a Reftest from a blueprint, treat the `<pre_conditions>` as structural guidelines, not strict requirements. If the `<pre_conditions>` request multiple HTML elements (like a container with multiple children), but assigning explicit CSS dimensions or applying standard visual patterns (like a single 100x100 green square) makes some of those requested DOM elements visually or geometrically redundant, you **MUST** remove them to minimize boilerplate. Do not blindly copy HTML elements from a blueprint or from legacy "Golden Examples" if they do not participate in the layout or the interaction being tested.
+- **Prefer Pseudo-Elements:** Whenever a test requires verifying a behavior on pseudo-elements, or for visual tricks like "Red-Under-Green" and stacking context triggers, you MUST attach those pseudo-elements directly to pre-existing structural container nodes. Do not introduce new, dedicated, empty DOM elements purely to host them.
 
 - **The Green Square**: A very common pattern. The test passes if it produces a 100x100 green square.
 - **Color Meanings**:
     - **Green**: Success.
-    - **Red**: Failure. Often placed *under* the test content so it only appears if something is misaligned.
+    - **Red**: Failure. Often placed *under* the test content so it only appears if something is misaligned or paints incorrectly.
     - **Black**: Descriptive text.
     - **Silver/Gray**: Irrelevant filler content.
 - **No Scrollbars**: Avoid scrollbars at an 800x600 window size unless testing scrolling itself.
 
-### Example: The Red-Under-Green Pattern
+### Example: The Optimized Red-Under-Green Pattern
 ```html
-<div style="width: 100px; height: 100px; background: red;">
-  <!-- This green box should perfectly cover the red box -->
-  <div style="width: 100px; height: 100px; background: green; margin-top: -100px;"></div>
-</div>
+<style>
+.test-box, .test-box::before {
+  width: 100px;
+  height: 100px;
+}
+.test-box {
+  background: green;
+}
+.test-box::before {
+  content: "";
+  position: absolute; /* or negative z-index depending on test goals */
+  background: red;
+}
+</style>
+<div class="test-box"></div>
 ```
 
-## 5. Using the Ahem Font
+## 6. Using the Ahem Font
 
 When testing text layout, standard fonts are unreliable due to platform differences. Use the **Ahem font**, which has precise, square metrics.
 
@@ -86,7 +128,7 @@ When testing text layout, standard fonts are unreliable due to platform differen
 }
 ```
 
-## 6. Advanced Reftest Features
+## 7. Advanced Reftest Features
 
 ### Asynchronous Tests (`reftest-wait`)
 If your test requires DOM manipulation or animation before the screenshot, use the `reftest-wait` class on the root element.
@@ -129,7 +171,7 @@ If subtle anti-aliasing differences are expected, use the `fuzzy` meta tag.
 - If multiple `rel="match"` links are present, the test passes if **at least one** matches.
 - If multiple `rel="mismatch"` links are present, the test passes if **all** mismatch.
 
-## 7. Print Reftests
+## 8. Print Reftests
 
 Print reftests verify paginated output.
 - **Naming**: Use the `-print` suffix or place in a `print/` directory.
@@ -137,7 +179,7 @@ Print reftests verify paginated output.
 - **Page Size**: The default page size is 12.7 cm by 7.62 cm (5x3 inches) with 12.7 mm (0.5 inch) margins.
 - **Page Range**: Use `<meta name="reftest-pages" content="1-2, 5">` to limit comparison.
 
-## 8. General Requirements and Metadata
+## 9. General Requirements and Metadata
 
 ### Essential Metadata
 - **Charset**: Always include `<meta charset="utf-8">`.
@@ -169,12 +211,9 @@ Example:
 - **No External Resources**: Tests must be self-contained; do not link to external CDNs or images.
 - **Cross-Platform**: Ensure the test doesn't rely on specific screen resolutions or installed system fonts (use Ahem instead).
 
-## 9. Validation and Running
+## 10. Validation and Running
 
-- **Linting**: Always run `./wpt lint` before submitting. It catches metadata errors, trailing whitespace, and more.
-- **Running**: Use `wpt run <browser> <path/to/test>` to verify your test locally.
-  ```bash
-  python ./wpt run chrome html/semantics/text-level-semantics/the-bdo-element/rtl.html
-  ```
+- **Linting**: Always run the `run_wpt_lint` tool before submitting. It catches metadata errors, trailing whitespace, and more.
+- **Running**: Use the `run_wpt_test` tool on your test file to verify it locally.
 
 By following these best practices, you ensure your reftests are a reliable part of the Web Platform Tests suite.

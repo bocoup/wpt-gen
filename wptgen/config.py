@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib.resources
 import logging
 import os
 import sys
@@ -22,6 +23,11 @@ from typing import Any
 import yaml
 
 from wptgen.models import BrowserChannel, BrowserType, WorkflowPhase
+
+# The absolute path to the installed wptgen package root
+PACKAGE_ROOT = Path(str(importlib.resources.files('wptgen')))
+TEMPLATE_DIR = PACKAGE_ROOT / 'templates'
+SKILLS_DIR = PACKAGE_ROOT / 'skills'
 
 # Default timeout for LLM requests in seconds (10 minutes)
 DEFAULT_LLM_TIMEOUT = 600
@@ -74,6 +80,7 @@ class Config:
   spec_urls: list[str] | None = None
   feature_description: str | None = None
   detailed_requirements: bool = False
+  include_mdn_docs: bool = False
   draft: bool = False
   chromestatus: bool = False
   single_prompt_requirements: bool = False
@@ -189,6 +196,7 @@ def load_config(
   spec_urls_override: list[str] | None = None,
   feature_description_override: str | None = None,
   detailed_requirements_override: bool = False,
+  include_mdn_docs_override: bool = False,
   draft_override: bool = False,
   chromestatus_override: bool = False,
   single_prompt_requirements_override: bool = False,
@@ -243,12 +251,12 @@ def load_config(
     'reasoning': provider_defaults['reasoning'],
   }
 
-  if active_provider == 'gemini':
-    env_var_name = 'GEMINI_API_KEY'
-  elif active_provider == 'openai':
-    env_var_name = 'OPENAI_API_KEY'
-  elif active_provider == 'anthropic':
-    env_var_name = 'ANTHROPIC_API_KEY'
+  env_var_map = {
+    'gemini': 'GEMINI_API_KEY',
+    'openai': 'OPENAI_API_KEY',
+    'anthropic': 'ANTHROPIC_API_KEY',
+  }
+  env_var_name = env_var_map.get(active_provider, f'{active_provider.upper()}_API_KEY')
 
   # Enforce the environment variable constraint for the active provider
   api_key = os.environ.get(env_var_name)
@@ -282,6 +290,7 @@ def load_config(
   detailed_requirements = detailed_requirements_override or yaml_data.get(
     'detailed_requirements', False
   )
+  include_mdn_docs = include_mdn_docs_override or yaml_data.get('include_mdn_docs', False)
   single_prompt_requirements = single_prompt_requirements_override or yaml_data.get(
     'single_prompt_requirements', False
   )
@@ -348,6 +357,7 @@ def load_config(
     spec_urls=spec_urls_override,
     feature_description=feature_description_override,
     detailed_requirements=detailed_requirements,
+    include_mdn_docs=include_mdn_docs,
     draft=draft,
     chromestatus=chromestatus,
     single_prompt_requirements=single_prompt_requirements,

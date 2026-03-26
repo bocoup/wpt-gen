@@ -28,7 +28,7 @@ from jinja2 import Environment
 from wptgen.agents.provider import setup_adk_environment
 from wptgen.agents.streaming import ADKStreamManager
 from wptgen.agents.tools import _validate_safe_path, create_agent_tools
-from wptgen.config import Config
+from wptgen.config import SKILLS_DIR, Config
 from wptgen.models import TestType, WorkflowContext
 from wptgen.ui import UIProvider
 
@@ -41,8 +41,6 @@ async def generate_test_with_adk(
   config: Config,
   jinja_env: Environment,
   ui: UIProvider,
-  wpt_style_guide: str,
-  test_type_guide: str,
 ) -> list[tuple[Path, str, str]]:
   """Runs the ADK Agent to generate tests for a single blueprint.
 
@@ -54,8 +52,6 @@ async def generate_test_with_adk(
       config: The configuration object.
       jinja_env: The Jinja2 environment for loading templates.
       ui: The UI provider for logging output.
-      wpt_style_guide: The general WPT style guide content.
-      test_type_guide: The specific style guide for this test type.
 
   Returns:
       A list of tuples containing (file_path, file_content, suggestion_xml).
@@ -83,7 +79,7 @@ async def generate_test_with_adk(
   )
   tools.append(FunctionTool(func=report_generation_complete))
 
-  skill_dir = Path(__file__).parent.parent.parent / '.agents' / 'skills' / 'wpt-generator'
+  skill_dir = SKILLS_DIR / 'wpt-generator'
   if skill_dir.is_dir():
     try:
       wpt_generator_skill = load_skill_from_dir(skill_dir)
@@ -98,9 +94,7 @@ async def generate_test_with_adk(
 
   system_template = jinja_env.get_template('adk_test_generator_system.jinja')
   instruction = system_template.render(
-    wpt_style_guide=wpt_style_guide,
     test_type=test_type_enum.value,
-    test_type_guide=test_type_guide,
   )
 
   # Prevent ADK's internal template parser from crashing when it encounters
@@ -130,7 +124,7 @@ async def generate_test_with_adk(
 
   agent = Agent(**agent_kwargs)
 
-  session_service = InMemorySessionService()  # type: ignore
+  session_service = InMemorySessionService()  # type: ignore[no-untyped-call]
   session = await session_service.create_session(
     app_name='wpt-gen', user_id='cli_user', session_id=f'gen_{root_name}', state=adk_state
   )
@@ -165,6 +159,9 @@ async def generate_test_with_adk(
         stream_manager.process_event(event)
 
     results = []
+    if not generated_paths:
+      ui.warning('Agent finished but did not report any generated paths.')
+
     # If the agent correctly called the completion tool, we read those files back
     for path_str in generated_paths:
       try:

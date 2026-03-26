@@ -75,7 +75,7 @@ wptgen = [
     "templates/*.jinja",
     "templates/*.xml",
     "templates/*.txt",
-    "templates/resources/*.md"
+    "skills/wpt-generator/**/*"
 ]
 
 [tool.ruff]

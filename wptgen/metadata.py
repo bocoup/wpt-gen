@@ -37,20 +37,18 @@ def update_web_features_yml(
     with open(yml_path, encoding='utf-8') as f:
       yaml_data = yaml.safe_load(f) or {}
 
-  if 'features' not in yaml_data:
-    yaml_data['features'] = {}
+  if 'features' not in yaml_data or not isinstance(yaml_data['features'], list):
+    # Ensure it's a list. If not, override it.
+    yaml_data['features'] = []
 
-  if not isinstance(yaml_data['features'], dict):
-    # Handle unexpected type, maybe it's a list. But standard is dict.
-    yaml_data['features'] = {}
+  features_list: list[dict[str, Any]] = yaml_data['features']
 
-  features_dict = yaml_data['features']
+  feature_block = next((f for f in features_list if f.get('name') == web_feature_id), None)
 
-  if web_feature_id not in features_dict:
-    features_dict[web_feature_id] = {}
-
-  feature_block = features_dict[web_feature_id]
-  if 'files' not in feature_block:
+  if feature_block is None:
+    feature_block = {'name': web_feature_id, 'files': []}
+    features_list.append(feature_block)
+  elif 'files' not in feature_block:
     feature_block['files'] = []
 
   existing_patterns = feature_block['files']

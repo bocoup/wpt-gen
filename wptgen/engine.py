@@ -18,7 +18,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from wptgen.config import Config
+from wptgen.config import TEMPLATE_DIR, Config
 from wptgen.llm import get_llm_client
 from wptgen.models import WorkflowContext, WorkflowPhase
 from wptgen.phases.context_assembly import run_context_assembly
@@ -53,8 +53,7 @@ class WPTGenEngine:
     self.ui = ui
     self.llm = get_llm_client(config)
 
-    template_dir = Path(__file__).parent.joinpath('templates')
-    self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
+    self.jinja_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
     assert self.config.cache_path is not None, 'cache_path must be set in configuration'
     self.cache_dir = Path(self.config.cache_path)
@@ -241,10 +240,7 @@ class WPTGenEngine:
     if self.config.suggestions_only or self.config.brief_suggestions:
       await provide_coverage_report(context, self.config, self.ui)
       # Cleanup resume file if it exists, as this is a terminal state for suggestions-only
-      resume_file = self._get_resume_file_path(web_feature_id)
-      if resume_file.exists():
-        resume_file.unlink()
-
+      self._get_resume_file_path(web_feature_id).unlink(missing_ok=True)
       return context
 
     # Phase 4: User Selection & Generation
@@ -259,8 +255,6 @@ class WPTGenEngine:
       self.ui.success('Skipping Phase 4: Tests already generated.')
 
     # Final cleanup of resume file on success
-    resume_file = self._get_resume_file_path(web_feature_id)
-    if resume_file.exists():
-      resume_file.unlink()
+    self._get_resume_file_path(web_feature_id).unlink(missing_ok=True)
 
     return context

@@ -13,13 +13,17 @@
 # limitations under the License.
 
 
+import dataclasses
 import logging
+import os
 import shutil
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as app_version
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 import yaml
@@ -85,6 +89,130 @@ app = typer.Typer(
 )
 console = Console()
 ui = RichUIProvider(console)
+
+
+def _check_workflow_flags(
+  wf_yml_update: bool,
+  output_dir: Path | None,
+  use_lightweight: bool,
+  use_reasoning: bool,
+  yes_cache: bool,
+  no_cache: bool,
+  detailed_requirements: bool,
+  single_prompt_requirements: bool,
+) -> None:
+  if wf_yml_update and not output_dir:
+    ui.error('--output-dir is required when using --wf-yml-update.')
+    raise typer.Exit(code=1)
+
+  if use_lightweight and use_reasoning:
+    ui.error('Cannot use both --use-lightweight and --use-reasoning.')
+    raise typer.Exit(code=1)
+
+  if yes_cache and no_cache:
+    ui.error('Cannot use both --yes-cache and --no-cache.')
+    raise typer.Exit(code=1)
+
+  if detailed_requirements and single_prompt_requirements:
+    ui.error('Cannot use both --detailed-requirements and --single-prompt-requirements.')
+    raise typer.Exit(code=1)
+
+
+def _print_workflow_banner(web_feature_id: str) -> None:
+  banner = Panel(
+    Align.center(
+      Text.from_markup(
+        '[bold blue]WPT[/bold blue][bold white]-[/bold white][bold green]Gen[/bold green]\n'
+        '[italic white]AI-Powered Web Platform Test Generation[/italic white]'
+      )
+    ),
+    border_style='bright_blue',
+  )
+  console.print(banner)
+  console.print(f'\n[bold]Target Feature:[/bold] [cyan]{web_feature_id}[/cyan]\n')
+
+
+@contextmanager
+def _workflow_error_handler() -> Generator[None, None, None]:
+  try:
+    yield
+  except LLMTimeoutError as e:
+    console.print(f'[bold red]LLM Request Timeout:[/bold red] {str(e)}')
+    raise typer.Exit(code=1) from e
+  except ValueError as e:
+    # Catch configuration errors (like missing API keys) and exit gracefully
+    console.print(f'[bold red]Configuration Error:[/bold red] {str(e)}')
+    raise typer.Exit(code=1) from e
+  except WorkflowError:
+    console.print()
+    console.print(
+      Panel(
+        '[bold red]✘ Workflow completed with errors.[/bold red]',
+        border_style='red',
+        expand=False,
+      )
+    )
+    raise typer.Exit(code=1) from None
+  except Exception as e:
+    # Catch unexpected runtime errors
+    console.print(f'[bold red]Unexpected Error:[/bold red] {str(e)}')
+    raise typer.Exit(code=1) from e
+
+
+def _execute_workflow(
+  web_feature_id: str,
+  config: Any,
+  wf_yml_update: bool,
+  output_dir: Path | None,
+  is_audit: bool = False,
+) -> None:
+  config_info = Text.assemble(
+    ('Provider: ', 'bold'),
+    (f'{config.provider}\n', 'green'),
+    ('Model:    ', 'bold'),
+    (f'{config.default_model}', 'green'),
+  )
+  console.print(
+    Panel(
+      config_info,
+      title='[bold]Configuration[/bold]',
+      title_align='left',
+      expand=False,
+      border_style='bright_black',
+    )
+  )
+
+  # Instantiate the core engine
+  engine = WPTGenEngine(config=config, ui=ui)
+
+  # Execute the workflow
+  context = engine.run_workflow(web_feature_id)
+
+  if is_audit:
+    console.print()
+    console.print(
+      Panel(
+        '[bold green]✔ Audit completed successfully! Blueprints generated.[/bold green]',
+        border_style='green',
+        expand=False,
+      )
+    )
+  else:
+    if wf_yml_update and output_dir and context and context.generated_tests:
+      from wptgen.metadata import update_web_features_yml
+
+      generated_paths = [path for path, _, _ in context.generated_tests]
+      update_web_features_yml(output_dir, web_feature_id, generated_paths)
+      console.print(f'[bold green]✔ Updated WEB_FEATURES.yml for {web_feature_id}[/bold green]')
+
+    console.print()
+    console.print(
+      Panel(
+        '[bold green]✔ Workflow completed successfully![/bold green]',
+        border_style='green',
+        expand=False,
+      )
+    )
 
 
 @app.command()
@@ -237,6 +365,13 @@ def generate(
       help='Use a more detailed, iterative requirements extraction process.',
     ),
   ] = False,
+  include_mdn_docs: Annotated[
+    bool,
+    typer.Option(
+      '--include-mdn-docs',
+      help='Include MDN documentation in requirements extraction.',
+    ),
+  ] = False,
   include_thoughts: Annotated[
     bool,
     typer.Option(
@@ -312,37 +447,19 @@ def generate(
   """
   Generate Web Platform Tests for a specific web feature.
   """
-  banner = Panel(
-    Align.center(
-      Text.from_markup(
-        '[bold blue]WPT[/bold blue][bold white]-[/bold white][bold green]Gen[/bold green]\n'
-        '[italic white]AI-Powered Web Platform Test Generation[/italic white]'
-      )
-    ),
-    border_style='bright_blue',
+  _print_workflow_banner(web_feature_id)
+  _check_workflow_flags(
+    wf_yml_update=wf_yml_update,
+    output_dir=output_dir,
+    use_lightweight=use_lightweight,
+    use_reasoning=use_reasoning,
+    yes_cache=yes_cache,
+    no_cache=no_cache,
+    detailed_requirements=detailed_requirements,
+    single_prompt_requirements=single_prompt_requirements,
   )
-  console.print(banner)
-  console.print(f'\n[bold]Target Feature:[/bold] [cyan]{web_feature_id}[/cyan]\n')
 
-  if wf_yml_update and not output_dir:
-    ui.error('--output-dir is required when using --wf-yml-update.')
-    raise typer.Exit(code=1)
-
-  if use_lightweight and use_reasoning:
-    ui.error('Cannot use both --use-lightweight and --use-reasoning.')
-    raise typer.Exit(code=1)
-
-  if yes_cache and no_cache:
-    ui.error('Cannot use both --yes-cache and --no-cache.')
-    raise typer.Exit(code=1)
-
-  if detailed_requirements and single_prompt_requirements:
-    ui.error('Cannot use both --detailed-requirements and --single-prompt-requirements.')
-    raise typer.Exit(code=1)
-
-  try:
-    # 1. Load configuration (merging YAML, env vars, and CLI overrides)
-
+  with _workflow_error_handler():
     # Convert Path object back to string if it was provided, else pass None
     wpt_dir_str = str(wpt_dir) if wpt_dir else None
     output_dir_str = str(output_dir) if output_dir else None
@@ -372,6 +489,7 @@ def generate(
       spec_urls_override=spec_urls_list,
       feature_description_override=description,
       detailed_requirements_override=detailed_requirements,
+      include_mdn_docs_override=include_mdn_docs,
       draft_override=draft,
       single_prompt_requirements_override=single_prompt_requirements,
       use_lightweight_override=use_lightweight,
@@ -383,6 +501,191 @@ def generate(
       include_thoughts_override=include_thoughts,
       run_on_browser_override=run_on_browser,
       run_on_channel_override=run_on_channel,
+    )
+
+    _execute_workflow(
+      web_feature_id=web_feature_id,
+      config=config,
+      wf_yml_update=wf_yml_update,
+      output_dir=output_dir,
+      is_audit=False,
+    )
+
+
+@app.command(name='chromestatus')
+def chromestatus_command(
+  feature_id: Annotated[
+    str,
+    typer.Argument(help='The ChromeStatus feature ID (e.g., "12345").'),
+  ],
+  provider: Annotated[
+    str | None,
+    typer.Option(
+      '--provider',
+      '-p',
+      help="Override the default LLM provider (e.g., 'gemini', 'openai', 'anthropic').",
+    ),
+  ] = None,
+  wpt_dir: Annotated[
+    Path | None,
+    typer.Option(
+      '--wpt-dir',
+      '-w',
+      help='Path to the local web-platform-tests repository.',
+      exists=True,
+      dir_okay=True,
+      resolve_path=True,
+    ),
+  ] = None,
+  output_dir: Annotated[
+    Path | None,
+    typer.Option(
+      '--output-dir',
+      '-o',
+      help='Directory where generated tests will be saved.',
+      dir_okay=True,
+    ),
+  ] = None,
+  config_path: Annotated[
+    str, typer.Option('--config', '-c', help='Path to a custom wpt-gen.yml file.')
+  ] = DEFAULT_CONFIG_PATH,
+  show_responses: Annotated[
+    bool,
+    typer.Option(
+      '--show-responses', '-s', help='Display every LLM-generated response to the user.'
+    ),
+  ] = False,
+  yes_tokens: Annotated[
+    bool,
+    typer.Option('--yes-tokens', help='Automatically confirm all token count prompts.'),
+  ] = False,
+  yes_cache: Annotated[
+    bool,
+    typer.Option(
+      '--yes-cache',
+      help='Automatically use the cache if it exists without prompting.',
+    ),
+  ] = False,
+  no_cache: Annotated[
+    bool,
+    typer.Option(
+      '--no-cache',
+      help='Automatically ignore and overwrite the cache if it exists without prompting.',
+    ),
+  ] = False,
+  resume: Annotated[
+    bool,
+    typer.Option(
+      '--resume',
+      help='Resume the workflow from the last successful phase.',
+    ),
+  ] = False,
+  max_retries: Annotated[
+    int,
+    typer.Option(
+      '--max-retries',
+      help='Maximum number of retries for LLM calls.',
+    ),
+  ] = 3,
+  timeout: Annotated[
+    int,
+    typer.Option(
+      '--timeout',
+      help='Timeout for LLM requests in seconds.',
+    ),
+  ] = DEFAULT_LLM_TIMEOUT,
+  include_thoughts: Annotated[
+    bool,
+    typer.Option(
+      '--include-thoughts',
+      help='Stream the underlying ADK model thoughts to stdout.',
+    ),
+  ] = False,
+  use_lightweight: Annotated[
+    bool,
+    typer.Option('--use-lightweight', help='Use the lightweight model for all LLM requests.'),
+  ] = False,
+  use_reasoning: Annotated[
+    bool,
+    typer.Option('--use-reasoning', help='Use the reasoning model for all LLM requests.'),
+  ] = False,
+  save_traces: Annotated[
+    bool,
+    typer.Option(
+      '--save-traces',
+      help='Save LLM interaction traces to the .wptgen/traces/ directory.',
+    ),
+  ] = False,
+  suggestions_only: Annotated[
+    bool,
+    typer.Option(
+      '--suggestions-only',
+      help='Only generate the coverage audit report, skip test generation.',
+    ),
+  ] = False,
+) -> None:
+  """
+  Perform a coverage audit and generate a report for a ChromeStatus feature.
+  """
+  banner = Panel(
+    Align.center(
+      Text.from_markup(
+        '[bold blue]WPT[/bold blue][bold white]-[/bold white][bold green]Gen[/bold green]\n'
+        '[italic white]AI-Powered Web Platform Test Generation[/italic white]'
+      )
+    ),
+    border_style='bright_blue',
+  )
+  console.print(banner)
+  console.print(f'\n[bold]Target ChromeStatus Feature:[/bold] [cyan]{feature_id}[/cyan]\n')
+
+  if not suggestions_only:
+    ui.error('Test generation for ChromeStatus entries is not yet implemented.')
+    ui.info('Please use --suggestions-only to generate the coverage audit report.')
+    raise typer.Exit(code=1)
+
+  if use_lightweight and use_reasoning:
+    ui.error('Cannot use both --use-lightweight and --use-reasoning.')
+    raise typer.Exit(code=1)
+
+  try:
+    # 1. Load configuration (merging YAML, env vars, and CLI overrides)
+    wpt_dir_str = str(wpt_dir) if wpt_dir else None
+    output_dir_str = str(output_dir) if output_dir else None
+
+    config = load_config(
+      config_path=config_path,
+      provider_override=provider,
+      wpt_dir_override=wpt_dir_str,
+      output_dir_override=output_dir_str,
+      show_responses=show_responses,
+      yes_tokens_override=yes_tokens,
+      yes_tests_override=False,
+      yes_cache_override=yes_cache,
+      no_cache_override=no_cache,
+      suggestions_only=suggestions_only,
+      brief_suggestions=False,
+      resume_override=resume,
+      resume_from_override=None,
+      state_dir_override=None,
+      max_retries_override=max_retries,
+      timeout_override=timeout,
+      spec_urls_override=None,
+      feature_description_override=None,
+      detailed_requirements_override=False,
+      include_mdn_docs_override=False,
+      draft_override=False,
+      chromestatus_override=True,
+      single_prompt_requirements_override=False,
+      use_lightweight_override=use_lightweight,
+      use_reasoning_override=use_reasoning,
+      include_thoughts_override=include_thoughts,
+      tentative_override=False,
+      save_traces_override=save_traces,
+      max_parallel_requests_override=None,
+      run_on_browser_override=None,
+      run_on_channel_override=None,
+      temperature_override=None,
     )
 
     config_info = Text.assemble(
@@ -405,20 +708,12 @@ def generate(
     engine = WPTGenEngine(config=config, ui=ui)
 
     # 3. Execute the workflow
-    # Note: In Phase 1, this will just print the skeleton output
-    context = engine.run_workflow(web_feature_id)
-
-    if wf_yml_update and output_dir and context and context.generated_tests:
-      from wptgen.metadata import update_web_features_yml
-
-      generated_paths = [path for path, _, _ in context.generated_tests]
-      update_web_features_yml(output_dir, web_feature_id, generated_paths)
-      console.print(f'[bold green]✔ Updated WEB_FEATURES.yml for {web_feature_id}[/bold green]')
+    engine.run_workflow(feature_id)
 
     console.print()
     console.print(
       Panel(
-        '[bold green]✔ Workflow completed successfully![/bold green]',
+        '[bold green]✔ ChromeStatus Audit completed successfully![/bold green]',
         border_style='green',
         expand=False,
       )
@@ -428,7 +723,6 @@ def generate(
     console.print(f'[bold red]LLM Request Timeout:[/bold red] {str(e)}')
     raise typer.Exit(code=1) from e
   except ValueError as e:
-    # Catch configuration errors (like missing API keys) and exit gracefully
     console.print(f'[bold red]Configuration Error:[/bold red] {str(e)}')
     raise typer.Exit(code=1) from e
   except WorkflowError:
@@ -442,7 +736,6 @@ def generate(
     )
     raise typer.Exit(code=1) from None
   except Exception as e:
-    # Catch unexpected runtime errors
     console.print(f'[bold red]Unexpected Error:[/bold red] {str(e)}')
     raise typer.Exit(code=1) from e
 
@@ -456,8 +749,6 @@ def doctor_command(
   """
   Verify that all system prerequisites are met.
   """
-  import os
-
   success = True
   console.print('[bold]WPT-Gen System Check[/bold]\n')
 
@@ -516,10 +807,6 @@ app.add_typer(config_app, name='config')
 
 def _display_config(config_path: str) -> None:
   try:
-    import dataclasses
-
-    import yaml
-
     config = load_config(config_path=config_path, require_api_key=False)
     config_dict = dataclasses.asdict(config)
 
@@ -580,11 +867,6 @@ def config_set(
   """
   Update an individual configuration setting using dot-notation.
   """
-  from pathlib import Path
-  from typing import Any
-
-  import yaml
-
   path = Path(config_path)
   target_file = path
 
@@ -809,6 +1091,13 @@ def audit(
       help='Use a more detailed, iterative requirements extraction process.',
     ),
   ] = False,
+  include_mdn_docs: Annotated[
+    bool,
+    typer.Option(
+      '--include-mdn-docs',
+      help='Include MDN documentation in requirements extraction.',
+    ),
+  ] = False,
   include_thoughts: Annotated[
     bool,
     typer.Option(
@@ -877,37 +1166,19 @@ def audit(
   """
   Perform a gap analysis and generate coverage blueprints without generating WPT files.
   """
-  banner = Panel(
-    Align.center(
-      Text.from_markup(
-        '[bold blue]WPT[/bold blue][bold white]-[/bold white][bold green]Gen[/bold green]\n'
-        '[italic white]AI-Powered Web Platform Test Generation[/italic white]'
-      )
-    ),
-    border_style='bright_blue',
+  _print_workflow_banner(web_feature_id)
+  _check_workflow_flags(
+    wf_yml_update=wf_yml_update,
+    output_dir=output_dir,
+    use_lightweight=use_lightweight,
+    use_reasoning=use_reasoning,
+    yes_cache=yes_cache,
+    no_cache=no_cache,
+    detailed_requirements=detailed_requirements,
+    single_prompt_requirements=single_prompt_requirements,
   )
-  console.print(banner)
-  console.print(f'\n[bold]Target Feature:[/bold] [cyan]{web_feature_id}[/cyan]\n')
 
-  if wf_yml_update and not output_dir:
-    ui.error('--output-dir is required when using --wf-yml-update.')
-    raise typer.Exit(code=1)
-
-  if use_lightweight and use_reasoning:
-    ui.error('Cannot use both --use-lightweight and --use-reasoning.')
-    raise typer.Exit(code=1)
-
-  if yes_cache and no_cache:
-    ui.error('Cannot use both --yes-cache and --no-cache.')
-    raise typer.Exit(code=1)
-
-  if detailed_requirements and single_prompt_requirements:
-    ui.error('Cannot use both --detailed-requirements and --single-prompt-requirements.')
-    raise typer.Exit(code=1)
-
-  try:
-    # 1. Load configuration (merging YAML, env vars, and CLI overrides)
-
+  with _workflow_error_handler():
     # Convert Path object back to string if it was provided, else pass None
     wpt_dir_str = str(wpt_dir) if wpt_dir else None
     output_dir_str = str(output_dir) if output_dir else None
@@ -937,6 +1208,7 @@ def audit(
       spec_urls_override=spec_urls_list,
       feature_description_override=description,
       detailed_requirements_override=detailed_requirements,
+      include_mdn_docs_override=include_mdn_docs,
       draft_override=draft,
       single_prompt_requirements_override=single_prompt_requirements,
       use_lightweight_override=use_lightweight,
@@ -950,59 +1222,13 @@ def audit(
       run_on_channel_override=run_on_channel,
     )
 
-    config_info = Text.assemble(
-      ('Provider: ', 'bold'),
-      (f'{config.provider}\n', 'green'),
-      ('Model:    ', 'bold'),
-      (f'{config.default_model}', 'green'),
+    _execute_workflow(
+      web_feature_id=web_feature_id,
+      config=config,
+      wf_yml_update=wf_yml_update,
+      output_dir=output_dir,
+      is_audit=True,
     )
-    console.print(
-      Panel(
-        config_info,
-        title='[bold]Configuration[/bold]',
-        title_align='left',
-        expand=False,
-        border_style='bright_black',
-      )
-    )
-
-    # 2. Instantiate the core engine
-    engine = WPTGenEngine(config=config, ui=ui)
-
-    # 3. Execute the workflow
-    # Note: In Phase 1, this will just print the skeleton output
-    engine.run_workflow(web_feature_id)
-
-    console.print()
-    console.print(
-      Panel(
-        '[bold green]✔ Audit completed successfully! Blueprints generated.[/bold green]',
-        border_style='green',
-        expand=False,
-      )
-    )
-
-  except LLMTimeoutError as e:
-    console.print(f'[bold red]LLM Request Timeout:[/bold red] {str(e)}')
-    raise typer.Exit(code=1) from e
-  except ValueError as e:
-    # Catch configuration errors (like missing API keys) and exit gracefully
-    console.print(f'[bold red]Configuration Error:[/bold red] {str(e)}')
-    raise typer.Exit(code=1) from e
-  except WorkflowError:
-    console.print()
-    console.print(
-      Panel(
-        '[bold red]✘ Workflow completed with errors.[/bold red]',
-        border_style='red',
-        expand=False,
-      )
-    )
-    raise typer.Exit(code=1) from None
-  except Exception as e:
-    # Catch unexpected runtime errors
-    console.print(f'[bold red]Unexpected Error:[/bold red] {str(e)}')
-    raise typer.Exit(code=1) from e
 
 
 @app.command(name='clear-cache')

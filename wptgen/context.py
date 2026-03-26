@@ -98,6 +98,12 @@ def fetch_chromestatus_metadata(feature_id: str) -> FeatureMetadata | None:
     req = urllib.request.Request(url, headers={'User-Agent': 'WPT-Gen/1.0'})
     with urllib.request.urlopen(req) as response:
       content = response.read().decode('utf-8')
+      # ChromeStatus API often prefixes JSON with a vulnerability protection string.
+      if content.startswith(")]}'\n"):
+        content = content[5:]
+      elif content.startswith(")]}'"):
+        content = content[4:]
+
       data = json.loads(content)
 
       # Map ChromeStatus fields to FeatureMetadata
@@ -155,6 +161,21 @@ def fetch_mdn_urls(web_feature_id: str) -> list[str]:
   except (urllib.error.HTTPError, json.JSONDecodeError, KeyError) as e:
     logger.warning(f'Could not fetch or parse MDN mapping: {e}')
     return []
+
+
+def fetch_explainer_contents(urls: list[str]) -> dict[str, str]:
+  """
+  Fetches and extracts text content from a list of explainer URLs.
+
+  Returns:
+    Dictionary mapping each URL to its extracted markdown content.
+  """
+  contents = {}
+  for url in urls:
+    res = fetch_and_extract_text(url)
+    if res:
+      contents[url] = res
+  return contents
 
 
 def extract_feature_metadata(feature_data: dict[str, Any]) -> FeatureMetadata:
@@ -390,7 +411,7 @@ def find_feature_tests(target_directory: str, feature_id: str) -> list[str]:
     except yaml.YAMLError:
       continue
     except Exception as e:
-      print(f'Error processing {yaml_path}: {e}')
+      logger.warning(f'Error processing {yaml_path}: {e}')
 
   # Convert back to a sorted list of absolute string paths
   return sorted(relevant_files)
