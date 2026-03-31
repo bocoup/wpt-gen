@@ -25,7 +25,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
 from rich.table import Table
 
@@ -62,7 +62,7 @@ class UIProvider(Protocol):
     def confirm(self, question: str, default: bool = True) -> bool:
         ...
 
-    def prompt(self, question: str, default: str = "") -> str:
+    def prompt(self, message: str, default: str = "") -> str:
         ...
 
     # Generic semantic messaging
@@ -88,7 +88,9 @@ class UIProvider(Protocol):
         ...
 
     # Phase and lifecycle events
-    def on_phase_start(self, phase_num: int, phase_name: str) -> None:
+    def on_phase_start(
+        self, phase_num: int, phase_name: str, model_info: str | None = None
+    ) -> None:
         ...
 
     def on_phase_complete(self, phase_name: str) -> None:
@@ -101,10 +103,10 @@ class UIProvider(Protocol):
     def report_context_summary(
         self,
         spec_len: int,
-        explainer_count: int | None = None,
+        test_count: int,
         mdn_count: int | None = None,
-        test_count: int | None = None,
         dep_count: int | None = None,
+        explainer_count: int | None = None,
     ) -> None:
         ...
 
@@ -200,10 +202,8 @@ class RichUIProvider:
     def confirm(self, question: str, default: bool = True) -> bool:
         return Confirm.ask(question, default=default)
 
-    def prompt(self, question: str, default: str = "") -> str:
-        from rich.prompt import Prompt
-
-        return Prompt.ask(question, default=default)
+    def prompt(self, message: str, default: str = "") -> str:
+        return Prompt.ask(message, default=default)
 
     def print(self, message: Any = "", style: str | None = None) -> None:
         self.console.print(message, style=style)
@@ -239,9 +239,13 @@ class RichUIProvider:
                 Syntax(diff_text, "diff", theme="monokai", line_numbers=False)
             )
 
-    def on_phase_start(self, phase_num: int, phase_name: str) -> None:
+    def on_phase_start(
+        self, phase_num: int, phase_name: str, model_info: str | None = None
+    ) -> None:
         self.console.print()
         self.console.rule(f"[bold cyan]Phase {phase_num}: {phase_name}")
+        if model_info:
+            self.console.print(f"[dim]Using model: {model_info}[/dim]")
         self.console.print()
 
     def on_phase_complete(self, phase_name: str) -> None:
@@ -259,13 +263,6 @@ class RichUIProvider:
             "[bold]Spec URL:[/bold]", f"[blue]{metadata.specs[0]}[/blue]"
         )
 
-        if metadata.explainer_links:
-            explainer_links = "\n".join(metadata.explainer_links)
-            metadata_table.add_row(
-                "[bold]Explainer URLs:[/bold]",
-                f"[blue]{explainer_links}[/blue]",
-            )
-
         self.console.print(
             Panel(
                 metadata_table,
@@ -278,22 +275,21 @@ class RichUIProvider:
     def report_context_summary(
         self,
         spec_len: int,
-        explainer_count: int | None = None,
+        test_count: int,
         mdn_count: int | None = None,
-        test_count: int | None = None,
         dep_count: int | None = None,
+        explainer_count: int | None = None,
     ) -> None:
         parts = [f"{spec_len} chars of spec"]
         if explainer_count is not None:
             parts.append(f"{explainer_count} explainers")
         if mdn_count is not None:
             parts.append(f"{mdn_count} MDN pages")
-        if test_count is not None:
-            parts.append(f"{test_count} tests")
+        parts.append(f"{test_count} tests")
         if dep_count is not None:
             parts.append(f"{dep_count} dependency files")
 
-        self.success(f'Context gathered: {", ".join(parts)}.')
+        self.success(f"Context gathered: {', '.join(parts)}.")
 
     def report_token_usage(
         self,

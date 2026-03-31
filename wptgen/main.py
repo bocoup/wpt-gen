@@ -168,18 +168,16 @@ def _workflow_error_handler() -> Generator[None, None, None]:
         raise typer.Exit(code=1) from e
 
 
-def _execute_workflow(
-    web_feature_id: str,
-    config: Any,
-    wf_yml_update: bool,
-    output_dir: Path | None,
-    is_audit: bool = False,
-) -> None:
+def _print_run_config(config: Any) -> None:
     config_info = Text.assemble(
-        ("Provider: ", "bold"),
+        ("Provider:    ", "bold"),
         (f"{config.provider}\n", "green"),
-        ("Model:    ", "bold"),
-        (f"{config.default_model}", "green"),
+        ("Default:     ", "bold"),
+        (f"{config.default_model}\n", "green"),
+        ("Lightweight: ", "bold"),
+        (f'{config.categories.get("lightweight", "N/A")}\n', "green"),
+        ("Reasoning:   ", "bold"),
+        (f'{config.categories.get("reasoning", "N/A")}', "green"),
     )
     console.print(
         Panel(
@@ -190,6 +188,16 @@ def _execute_workflow(
             border_style="bright_black",
         )
     )
+
+
+def _execute_workflow(
+    web_feature_id: str,
+    config: Any,
+    wf_yml_update: bool,
+    output_dir: Path | None,
+    is_audit: bool = False,
+) -> None:
+    _print_run_config(config)
 
     # Instantiate the core engine
     engine = WPTGenEngine(config=config, ui=ui)
@@ -207,14 +215,11 @@ def _execute_workflow(
             )
         )
     else:
-        target_dir = output_dir or (
-            Path(config.output_dir) if config.output_dir else None
-        )
-        if wf_yml_update and target_dir and context and context.generated_tests:
+        if wf_yml_update and output_dir and context and context.generated_tests:
             from wptgen.metadata import update_web_features_yml
 
             generated_paths = [path for path, _, _ in context.generated_tests]
-            update_web_features_yml(target_dir, web_feature_id, generated_paths)
+            update_web_features_yml(output_dir, web_feature_id, generated_paths)
             console.print(
                 f"[bold green]✔ Updated WEB_FEATURES.yml for {web_feature_id}[/bold green]"
             )
@@ -328,13 +333,6 @@ def generate(
             help="Only generate test titles and descriptions for suggestions (omits detailed test suggestions).",
         ),
     ] = False,
-    skip_run: Annotated[
-        bool,
-        typer.Option(
-            "--skip-run",
-            help="Opt out of running generated tests.",
-        ),
-    ] = False,
     resume: Annotated[
         bool,
         typer.Option(
@@ -349,6 +347,13 @@ def generate(
             help="Resume the workflow explicitly from a specific phase.",
         ),
     ] = None,
+    skip_run: Annotated[
+        bool,
+        typer.Option(
+            "--skip-run",
+            help="Disable the agent's ability to run tests during generation.",
+        ),
+    ] = False,
     state_dir: Annotated[
         Path | None,
         typer.Option(
@@ -634,6 +639,13 @@ def chromestatus_command(
             help="Resume the workflow from the last successful phase.",
         ),
     ] = False,
+    skip_run: Annotated[
+        bool,
+        typer.Option(
+            "--skip-run",
+            help="Disable the agent's ability to run tests during generation.",
+        ),
+    ] = False,
     max_retries: Annotated[
         int,
         typer.Option(
@@ -701,6 +713,15 @@ def chromestatus_command(
         f"\n[bold]Target ChromeStatus Feature:[/bold] [cyan]{feature_id}[/cyan]\n"
     )
 
+    if not suggestions_only:
+        ui.error(
+            "Test generation for ChromeStatus entries is not yet implemented."
+        )
+        ui.info(
+            "Please use --suggestions-only to generate the coverage audit report."
+        )
+        raise typer.Exit(code=1)
+
     if use_lightweight and use_reasoning:
         ui.error("Cannot use both --use-lightweight and --use-reasoning.")
         raise typer.Exit(code=1)
@@ -723,6 +744,7 @@ def chromestatus_command(
             suggestions_only=suggestions_only,
             brief_suggestions=False,
             resume_override=resume,
+            skip_run_override=skip_run,
             resume_from_override=None,
             state_dir_override=None,
             max_retries_override=max_retries,
@@ -745,21 +767,7 @@ def chromestatus_command(
             temperature_override=None,
         )
 
-        config_info = Text.assemble(
-            ("Provider: ", "bold"),
-            (f"{config.provider}\n", "green"),
-            ("Model:    ", "bold"),
-            (f"{config.default_model}", "green"),
-        )
-        console.print(
-            Panel(
-                config_info,
-                title="[bold]Configuration[/bold]",
-                title_align="left",
-                expand=False,
-                border_style="bright_black",
-            )
-        )
+        _print_run_config(config)
 
         # 2. Instantiate the core engine
         engine = WPTGenEngine(config=config, ui=ui)
@@ -768,14 +776,9 @@ def chromestatus_command(
         engine.run_workflow(feature_id)
 
         console.print()
-        if suggestions_only:
-            msg = "[bold green]✔ ChromeStatus Audit completed successfully! Blueprints generated.[/bold green]"
-        else:
-            msg = "[bold green]✔ ChromeStatus Workflow completed successfully![/bold green]"
-
         console.print(
             Panel(
-                msg,
+                "[bold green]✔ ChromeStatus Audit completed successfully![/bold green]",
                 border_style="green",
                 expand=False,
             )
@@ -1163,13 +1166,6 @@ def audit(
             help="Only generate test titles and descriptions for suggestions (omits detailed test suggestions).",
         ),
     ] = False,
-    skip_run: Annotated[
-        bool,
-        typer.Option(
-            "--skip-run",
-            help="Opt out of running generated tests.",
-        ),
-    ] = False,
     resume: Annotated[
         bool,
         typer.Option(
@@ -1184,6 +1180,13 @@ def audit(
             help="Resume the workflow explicitly from a specific phase.",
         ),
     ] = None,
+    skip_run: Annotated[
+        bool,
+        typer.Option(
+            "--skip-run",
+            help="Disable the agent's ability to run tests during generation.",
+        ),
+    ] = False,
     state_dir: Annotated[
         Path | None,
         typer.Option(
@@ -1354,7 +1357,6 @@ def audit(
             suggestions_only=True,
             brief_suggestions=brief_suggestions,
             resume_override=resume,
-            skip_run_override=skip_run,
             resume_from_override=resume_from,
             state_dir_override=str(state_dir) if state_dir else None,
             max_retries_override=max_retries,

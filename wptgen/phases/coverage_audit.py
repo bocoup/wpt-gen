@@ -97,7 +97,8 @@ async def run_coverage_audit(
     ui: UIProvider,
     jinja_env: Environment,
 ) -> str | None:
-    ui.on_phase_start(3, "Coverage Audit")
+    model_info = config.get_model_info_for_phase(WorkflowPhase.COVERAGE_AUDIT)
+    ui.on_phase_start(3, "Coverage Audit", model_info)
 
     req_partitions = partition_requirements_xml(
         context.requirements_xml or "",

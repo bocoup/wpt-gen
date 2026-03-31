@@ -61,7 +61,10 @@ async def run_requirements_extraction(
     jinja_env: Environment,
     cache_dir: Path,
 ) -> str | None:
-    ui.on_phase_start(2, "Requirements Extraction")
+    model_info = config.get_model_info_for_phase(
+        WorkflowPhase.REQUIREMENTS_EXTRACTION
+    )
+    ui.on_phase_start(2, "Requirements Extraction", model_info)
 
     assert context.metadata is not None
 
@@ -134,7 +137,10 @@ async def run_requirements_extraction_categorized(
     jinja_env: Environment,
     cache_dir: Path,
 ) -> str | None:
-    ui.on_phase_start(2, "Requirements Extraction (Categorized)")
+    model_info = config.get_model_info_for_phase(
+        WorkflowPhase.REQUIREMENTS_EXTRACTION
+    )
+    ui.on_phase_start(2, "Requirements Extraction (Categorized)", model_info)
 
     assert context.metadata is not None
 
@@ -306,7 +312,10 @@ async def run_requirements_extraction_iterative(
     jinja_env: Environment,
     cache_dir: Path,
 ) -> str | None:
-    ui.on_phase_start(2, "Requirements Extraction (Iterative)")
+    model_info = config.get_model_info_for_phase(
+        WorkflowPhase.REQUIREMENTS_EXTRACTION
+    )
+    ui.on_phase_start(2, "Requirements Extraction (Iterative)", model_info)
 
     assert context.metadata is not None
 
