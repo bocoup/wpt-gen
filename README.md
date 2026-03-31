@@ -5,11 +5,11 @@
 
 **WPT-Gen** is an agentic CLI tool designed to increase browser interoperability by automating the creation of [Web Platform Tests (WPT)](https://web-platform-tests.org/).
 
-By bridging the gap between W3C Specifications and local WPT repositories, WPT-Gen uses Large Language Models (LLMs) to proactively identify testing gaps and generate high-quality, compliant test cases.
+To bridge the gap between W3C Specifications and local WPT repositories, WPT-Gen uses Large Language Models (LLMs) to proactively identify testing gaps and generate high-quality, compliant test cases.
 
-## Why WPT-Gen?
+## Forging a Unified Web
 
-Browser interoperability is critical for the web. While the W3C and WHATWG write specifications, there is often a gap between those specs and the tests that ensure browsers implement them correctly. **WPT-Gen** bridges this gap by:
+Browser interoperability is critical for the web. While the W3C and WHATWG write specifications, translating those specs into exhaustive tests is historically manual and error-prone. **WPT-Gen** tackles this challenge by:
 - **Reducing Manual Effort:** Automating the tedious process of mapping spec assertions to existing tests.
 - **Ensuring High Coverage:** Identifying missing edge cases and suggesting specific test scenarios.
 - **Standardizing Compliance:** Generating tests that adhere to strict WPT style guides and directory structures.
@@ -29,7 +29,7 @@ WPT-Gen follows a structured, multi-phase agentic workflow. Each phase is design
 
 ```mermaid
 flowchart TD
-    subgraph Context[Context Assembly]
+    subgraph Phase1[Phase 1: Context Assembly]
         A[Web Features] --> B[Scrape Specs/MDN]
         C[Local WPT Repo] --> D[Index Existing Tests]
     end
@@ -40,8 +40,8 @@ flowchart TD
         F --> G[test suggestions]
     end
 
-    subgraph Generation[Test Generation]
-        G --> H{{Test Generation}}
+    subgraph Phase4[Phase 4: Test Generation]
+        G --> H{{Generate WPT Tests}}
     end
 
     classDef llm fill:#4B0082,stroke:#333,stroke-width:2px;
@@ -55,7 +55,7 @@ For an in-depth explanation of the internal logic, inputs, outputs, and LLM inte
 1.  **Phase 1: Context Assembly:** Aggregates the "Source of Truth" from external documentation (W3C Specs, MDN) and identifies existing test coverage in the local WPT repository.
 2.  **Phase 2: Requirements Extraction:** Uses an LLM to synthesize specification text into structured, granular technical requirements. Supports parallel and iterative extraction modes for complex specs.
 3.  **Phase 3: Coverage Audit:** Performs a delta analysis by comparing the synthesized requirements against the local test suite. This phase outputs an audit worksheet and high-level test suggestions.
-4.  **Phase 4: Test Generation:** Translates user-selected test suggestions into functional WPT-compliant code (JavaScript, Reftests, or Crashtests) using an autonomous agent powered by `google-adk`, which leverages specialized file-system tools and style guide instructions.
+4.  **Phase 4: Test Generation:** Translates user-selected test suggestions into functional WPT-compliant code (Testharness, Reftests, or Crashtests) using an autonomous agent powered by `google-adk`, which leverages specialized file-system tools and style guide instructions.
 
 ## Prerequisites
 
@@ -173,8 +173,14 @@ wpt-gen generate font-family
 
 ### Other Commands
 
-*   `wpt-gen clear-cache`: Clears local cache of specs and LLM responses.
-*   `wpt-gen version`: Displays the current version.
+*   `wpt-gen audit`: Perform a gap analysis and generate coverage blueprints without generating WPT files.
+*   `wpt-gen chromestatus`: Perform a coverage audit and generate a report for a ChromeStatus feature.
+*   `wpt-gen clear-cache`: Clear the existing cached data for wpt-gen.
+*   `wpt-gen config`: Manage WPT-Gen configuration.
+*   `wpt-gen doctor`: Verify that all system prerequisites are met.
+*   `wpt-gen init`: Initialize a new wpt-gen configuration file interactively.
+*   `wpt-gen list-models`: Display the configured LLM models for the active provider.
+*   `wpt-gen version`: Print the version of wpt-gen.
 
 
 
