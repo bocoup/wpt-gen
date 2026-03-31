@@ -132,11 +132,17 @@ def _validate_safe_path(target_path: Path, wpt_root: Path) -> Path:
 
     # Try to calculate relative path. If it raises ValueError, it's outside.
     try:
-        resolved_target.relative_to(resolved_root)
+        rel_path = resolved_target.relative_to(resolved_root)
     except ValueError as e:
         raise ValueError(
             f"Path '{target_path}' is outside the designated WPT repository root."
         ) from e
+
+    # Enforce explicit deny-list for internal/sensitive files
+    if ".git" in rel_path.parts or ".env" in rel_path.parts:
+        raise ValueError(
+            f"Access to internal or sensitive repository path '{target_path}' is strictly prohibited."
+        )
 
     return resolved_target
 
