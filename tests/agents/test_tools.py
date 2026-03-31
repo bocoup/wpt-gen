@@ -14,7 +14,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from google.adk.tools.function_tool import FunctionTool
@@ -104,6 +104,19 @@ def test_tool_read_file(
 
     res3 = read_file.func(file_path="not_found.txt")
     assert res3["status"] == "error"
+
+
+def test_tool_read_file_exceeds_limit(
+    wpt_root: Path, agent_tools: dict[str, FunctionTool]
+) -> None:
+    read_file = agent_tools["read_file"]
+    test_file = wpt_root / "large.txt"
+    test_file.write_text("this content is 28 bytes")
+
+    with patch("wptgen.agents.tools.MAX_FILE_READ_BYTES", 5):
+        res = read_file.func(file_path="large.txt")
+        assert res["status"] == "error"
+        assert "exceeds maximum allowed read size" in res["error"]
 
 
 def test_tool_write_file(

@@ -110,6 +110,8 @@ def _parse_test_results(log_path: str) -> dict[str, str]:
 WPT_LINT_TIMEOUT_SECONDS = 15
 WPT_RUN_TIMEOUT_SECONDS = 60
 WPT_GREP_TIMEOUT_SECONDS = 15
+MAX_FILE_READ_BYTES = 5 * 1024 * 1024  # 5MB
+MAX_FILE_WRITE_BYTES = 5 * 1024 * 1024  # 5MB
 
 
 def _validate_safe_path(target_path: Path, wpt_root: Path) -> Path:
@@ -189,6 +191,13 @@ def create_agent_tools(
                     "status": "error",
                     "error": f"File not found: {file_path}",
                 }
+
+            if target.stat().st_size > MAX_FILE_READ_BYTES:
+                return {
+                    "status": "error",
+                    "error": f"File exceeds maximum allowed read size of {MAX_FILE_READ_BYTES} bytes.",
+                }
+
             content = target.read_text(encoding="utf-8")
 
             if start_line is not None or end_line is not None:
@@ -225,6 +234,13 @@ def create_agent_tools(
         """
         try:
             target = _validate_safe_path(Path(file_path), wpt_path)
+
+            if len(content.encode("utf-8")) > MAX_FILE_WRITE_BYTES:
+                return {
+                    "status": "error",
+                    "error": f"Content exceeds maximum allowed write size of {MAX_FILE_WRITE_BYTES} bytes.",
+                }
+
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
             return {"status": "success"}
