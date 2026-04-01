@@ -83,6 +83,16 @@ def test_validate_safe_path(wpt_root: Path) -> None:
     with pytest.raises(ValueError, match="outside the designated WPT"):
         _validate_safe_path(Path("/tmp/absolute.txt"), wpt_root)
 
+    # Test deny-list
+    with pytest.raises(ValueError, match="strictly prohibited"):
+        _validate_safe_path(Path(".git/config"), wpt_root)
+
+    with pytest.raises(ValueError, match="strictly prohibited"):
+        _validate_safe_path(Path("some_folder/../.git/config"), wpt_root)
+
+    with pytest.raises(ValueError, match="strictly prohibited"):
+        _validate_safe_path(Path(".env"), wpt_root)
+
 
 def test_create_agent_tools_initialization(
     wpt_root: Path, mocker: MockerFixture

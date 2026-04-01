@@ -52,6 +52,14 @@ BINARY_EXTENSIONS = {
     ".sqlite3",
 }
 
+BANNED_PATH_COMPONENTS = {
+    ".git",
+    ".env",
+    ".gemini",
+    "__pycache__",
+    ".pytest_cache",
+}
+
 
 def _parse_test_results(log_path: str) -> dict[str, str]:
     """Parses the JSON log output to extract failing test IDs and error messages."""
@@ -134,11 +142,17 @@ def _validate_safe_path(target_path: Path, wpt_root: Path) -> Path:
 
     # Try to calculate relative path. If it raises ValueError, it's outside.
     try:
-        resolved_target.relative_to(resolved_root)
+        rel_path = resolved_target.relative_to(resolved_root)
     except ValueError as e:
         raise ValueError(
             f"Path '{target_path}' is outside the designated WPT repository root."
         ) from e
+
+    # Enforce explicit deny-list for internal/sensitive files
+    if any(part in BANNED_PATH_COMPONENTS for part in rel_path.parts):
+        raise ValueError(
+            f"Access to internal or sensitive repository path '{target_path}' is strictly prohibited."
+        )
 
     return resolved_target
 
