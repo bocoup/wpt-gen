@@ -432,7 +432,7 @@ def create_agent_tools(
             # We use subprocess.run directly as these tools are executed synchronously by ADK currently
             try:
                 result = subprocess.run(
-                    ["./wpt", "lint", rel_path],
+                    ["./wpt", "lint", f"./{rel_path}"],
                     cwd=str(wpt_path),
                     capture_output=True,
                     text=True,
@@ -497,7 +497,7 @@ def create_agent_tools(
                         "--log-raw",
                         log_path,
                         browser,
-                        rel_path,
+                        f"./{rel_path}",
                     ]
                 )
 
