@@ -18,21 +18,16 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from enum import Enum
 from typing import Any
 
 import yaml
 
-from wptgen.models import BrowserChannel, BrowserType, WorkflowPhase
-
-
-class ModelCategory(str, Enum):
-    """Categories of LLM models used in the workflow."""
-
-    DEFAULT = "default"
-    LIGHTWEIGHT = "lightweight"
-    REASONING = "reasoning"
-
+from wptgen.models import (
+    BrowserChannel,
+    BrowserType,
+    ModelCategory,
+    WorkflowPhase,
+)
 
 # The absolute path to the installed wptgen package root
 PACKAGE_ROOT = Path(str(importlib.resources.files("wptgen")))
@@ -295,10 +290,14 @@ def load_config(
         )
 
     provider_defaults = DEFAULT_PROVIDER_MODELS[active_provider]
-    default_model_name = provider_defaults["default"]
+    default_model_name = provider_defaults[ModelCategory.DEFAULT.value]
     default_categories = {
-        "lightweight": provider_defaults["lightweight"],
-        "reasoning": provider_defaults["reasoning"],
+        ModelCategory.LIGHTWEIGHT.value: provider_defaults[
+            ModelCategory.LIGHTWEIGHT.value
+        ],
+        ModelCategory.REASONING.value: provider_defaults[
+            ModelCategory.REASONING.value
+        ],
     }
 
     env_var_map = {
@@ -394,15 +393,19 @@ def load_config(
     )
 
     if use_lightweight_override:
-        default_model = categories.get("lightweight", default_model)
+        default_model = categories.get(
+            ModelCategory.LIGHTWEIGHT.value, default_model
+        )
     elif use_reasoning_override:
-        default_model = categories.get("reasoning", default_model)
+        default_model = categories.get(
+            ModelCategory.REASONING.value, default_model
+        )
 
     # Ensure default mapping if missing in YAML
     default_phase_mapping = {
-        WorkflowPhase.REQUIREMENTS_EXTRACTION.value: "reasoning",
-        WorkflowPhase.COVERAGE_AUDIT.value: "reasoning",
-        WorkflowPhase.GENERATION.value: "lightweight",
+        WorkflowPhase.REQUIREMENTS_EXTRACTION.value: ModelCategory.REASONING.value,
+        WorkflowPhase.COVERAGE_AUDIT.value: ModelCategory.REASONING.value,
+        WorkflowPhase.GENERATION.value: ModelCategory.LIGHTWEIGHT.value,
     }
     phase_model_mapping = _deep_merge(
         default_phase_mapping, yaml_data.get("phase_model_mapping", {})

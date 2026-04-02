@@ -42,7 +42,7 @@ from wptgen.config import (
 )
 from wptgen.engine import WorkflowError, WPTGenEngine
 from wptgen.llm import LLMTimeoutError
-from wptgen.models import BrowserChannel, BrowserType, WorkflowPhase
+from wptgen.models import BrowserChannel, BrowserType, ModelCategory, WorkflowPhase
 from wptgen.ui import RichUIProvider
 
 
@@ -1507,8 +1507,8 @@ def init(
             provider: {
                 "default_model": default_model,
                 "categories": {
-                    "lightweight": lightweight_model,
-                    "reasoning": reasoning_model,
+                    ModelCategory.LIGHTWEIGHT.value: lightweight_model,
+                    ModelCategory.REASONING.value: reasoning_model,
                 },
             }
         },
