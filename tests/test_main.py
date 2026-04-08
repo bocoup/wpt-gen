@@ -655,14 +655,17 @@ def test_config_set_command_types() -> None:
 
 
 def test_generate_single_missing_spec_urls() -> None:
-    """Test that omitting --spec-urls raises an error."""
+    """Test that omitting both --spec-urls and --web-feature-id raises an error."""
     result = runner.invoke(
         app,
         ["generate-single", "Test description"],
         env={"NO_COLOR": "1", "TERM": "dumb"},
     )
     assert result.exit_code != 0
-    assert "Missing option '--spec-urls'" in result.output
+    assert (
+        "Either --spec-urls or --web-feature-id must be provided."
+        in result.output
+    )
 
 
 def test_generate_single_success(

@@ -651,12 +651,12 @@ def generate_single(
         typer.Argument(help="The specific behavior description to test."),
     ],
     spec_urls: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--spec-urls",
             help="Comma-separated list of specification URLs for the feature.",
         ),
-    ],
+    ] = None,
     web_feature_id: Annotated[
         str | None,
         typer.Option(
@@ -718,6 +718,12 @@ def generate_single(
     """
     Generate a single test directly from a user description, bypassing earlier phases.
     """
+    if not spec_urls and not web_feature_id:
+        ui.print(
+            "[red]Error: Either --spec-urls or --web-feature-id must be provided.[/red]"
+        )
+        raise typer.Exit(code=1)
+
     try:
         spec_urls_list = (
             [u.strip() for u in spec_urls.split(",")] if spec_urls else []
