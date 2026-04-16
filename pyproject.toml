@@ -78,6 +78,7 @@ dev = [
     "twine>=6.2.0",
     "pyink>=24.10.0",
     "pylint>=3.3.4",
+    "pip-tools>=7.4.0",
 ]
 
 [project.scripts]
