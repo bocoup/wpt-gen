@@ -19,6 +19,8 @@ updates:
     schedule:
       interval: "weekly"
     versioning-strategy: "increase-if-necessary"
+    allow:
+      - dependency-type: "direct"
     groups:
       all-pip-dependencies:
         patterns:
