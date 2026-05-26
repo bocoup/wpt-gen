@@ -1,0 +1,887 @@
+# WPT Evaluator Rules
+#
+# All rules in this file are currently derived from the upstream
+# `web-platform-tests/wpt` documentation tree. Provenance for each rule is
+# recorded in the `source` field.
+#
+# Schema notes:
+#   - `source`: a repo-root-relative path identifying where the rule comes
+#     from. The first path segment names the originating repository:
+#       `wpt/...`     — upstream web-platform-tests/wpt
+#       `wpt-gen/...` — this repository (wpt-gen)
+#     A `#L<start>-L<end>` line anchor is appended where the source location
+#     is stable.
+#   - `category`: the topic of the rule (what kind of issue it covers), e.g.,
+#     `assertions`, `metadata`. Categories never describe test kinds.
+#   - `applies_to`: which test kinds the rule is relevant to, e.g., `reftest`,
+#     `manual`, `idl`, `testharness`, `html`, `js`. Used for filtering.
+#   - Rule IDs are prefixed with a short category code so the ID and category
+#     stay in sync (e.g., `STRUCT-` for `structure`).
+#
+# See ../UPSTREAM.md for the pinned upstream commit and refresh procedure.
+# See ../SKILL.md for how this corpus is consumed.
+
+version: 0.3.0
+wpt_upstream_commit: 255065af5cc7d18e891ff558024eca5623a0b6ac
+
+# Category codes (used as rule ID prefixes):
+#   FMT     file-format
+#   NAME    filename
+#   META    metadata
+#   ASSERT  assertions
+#   ASYNC   async-timing
+#   INDEP   independence
+#   STRUCT  structure
+#   API     api-usage
+#   PORT    portability
+#   FOCUS   focus
+#   REV     review
+
+rules:
+
+  # ─── file-format ────────────────────────────────────────────────────────
+
+  - id: FMT-001
+    source: wpt/docs/writing-tests/general-guidelines.md#L82-L87
+    category: file-format
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Files must be encoded in UTF-8. In file formats where UTF-8 is not the
+      default encoding, they must contain metadata to mark them as such
+      (e.g., `<meta charset=utf-8>` in HTML files) or be pure ASCII.
+    cite: >
+      Except when specifically testing encoding, files must be encoded in
+      UTF-8. In file formats where UTF-8 is not the default encoding, they
+      must contain metadata to mark them as such (e.g., `<meta
+      charset=utf-8>` in HTML files) or be pure ASCII.
+
+  - id: FMT-002
+    source: wpt/docs/writing-tests/testharness.md#L60-L74
+    category: file-format
+    applies_to: [testharness, html]
+    severity: error
+    layer: deterministic
+    rule: |
+      HTML testharness tests must explicitly include both
+      `/resources/testharness.js` and `/resources/testharnessreport.js`.
+    cite: >
+      You need to be a bit more explicit and include the `testharness.js`
+      framework directly as well as an additional file used by
+      implementations.
+
+  - id: FMT-003
+    source: wpt/docs/writing-tests/testharness.md#L251-L252
+    category: file-format
+    applies_to: [testharness, js]
+    severity: error
+    layer: deterministic
+    rule: |
+      `.window.js`, `.any.js`, and `.extension.js` tests must NOT manually
+      include `/resources/testharness.js` or `/resources/testharnessreport.js`.
+      wptserve generates markup with these scripts included automatically.
+    cite: >
+      wptserve generates markup with `/resources/testharness.js` and
+      `/resources/testharnessreport.js` included automatically, so there's no
+      need to include those scripts from the `.js` test file.
+
+  - id: FMT-004
+    source: wpt/docs/writing-tests/testharness.md#L94-L115
+    category: file-format
+    applies_to: [testharness, js, worker]
+    severity: error
+    layer: deterministic
+    rule: |
+      `.worker.js` files must `importScripts("/resources/testharness.js")` at
+      the top and call `done()` at the end.
+    cite: >
+      Create a JavaScript file that imports `testharness.js` and whose
+      filename ends in `.worker.js` ... [example shows `importScripts(...)`
+      at top and `done();` at end]
+
+  - id: FMT-005
+    source: wpt/docs/writing-tests/testharness.md#L197-L200
+    category: file-format
+    applies_to: [testharness, js, any]
+    severity: info
+    layer: deterministic
+    rule: |
+      `.any.js` tests using the multi-global pattern automatically invoke
+      `done()` and do not need an explicit call.
+    cite: >
+      Although the global `done()` function must be explicitly invoked for
+      most dedicated worker tests and shared worker tests, it is
+      automatically invoked for tests defined using the "multi-global"
+      pattern.
+
+  - id: FMT-006
+    source: wpt/docs/writing-tests/testharness.md#L75-L93
+    category: file-format
+    applies_to: [testharness, html]
+    severity: warn
+    layer: deterministic
+    rule: |
+      For single-page HTML testharness tests using `setup({ single_test: true })`,
+      include a `<title>` element; the test title is taken from it.
+    cite: >
+      In this case the test title is taken from the `title` element.
+
+  # ─── filename ───────────────────────────────────────────────────────────
+
+  - id: NAME-001
+    source: wpt/docs/writing-tests/general-guidelines.md#L12-L13
+    category: filename
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Test paths must be less than 150 characters relative to the test root
+      directory, to respect Windows path length limitations.
+    cite: >
+      Due to path length limitations on Windows, test paths must be less
+      that 150 characters relative to the test root directory.
+
+  - id: NAME-002
+    source: wpt/docs/writing-tests/general-guidelines.md#L15-L22
+    category: filename
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: nit
+    layer: semantic
+    rule: |
+      File names should be descriptive of what is being tested. Very generic
+      names like `001.html` are discouraged. A common format is
+      `test-topic-001.html`, avoiding conjunctions, articles, and
+      prepositions; the integer is padded to three digits.
+    cite: >
+      File names should generally be somewhat descriptive of what is being
+      tested; very generic names like `001.html` are discouraged. A common
+      format is `test-topic-001.html`...
+
+  - id: NAME-003
+    source: wpt/docs/writing-tests/general-guidelines.md#L28-L30
+    category: filename
+    applies_to: [html, js, testharness, reftest]
+    severity: error
+    layer: deterministic
+    rule: |
+      In the `css/` directory, file names must be unique within the whole
+      `css/` directory, regardless of where they are in the directory
+      structure.
+    cite: >
+      In the css directory, the file names should be unique within the whole
+      css/ directory, regardless of where they are in the directory structure.
+
+  - id: NAME-004
+    source: wpt/docs/writing-tests/file-names.md#L14-L17
+    category: filename
+    applies_to: [manual, visual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Test type flags (`-manual`, `-visual`) must be the last `-` element
+      in the filename, immediately before the extension. `foo-manual.html`
+      is a manual test; `foo-manual-other.html` is not.
+    cite: >
+      These flags are preceded by a `-` and followed by a `.`, and must be
+      the last such element in the filename, e.g. `foo-manual.html` will
+      indicate a manual test, but `foo-manual-other.html` will not.
+
+  - id: NAME-005
+    source: wpt/docs/writing-tests/file-names.md#L29-L31
+    category: filename
+    applies_to: [html, js, testharness, reftest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Test feature flags (`.https`, `.h2`, `.www`, `.sub`, etc.) are preceded
+      and followed by `.` and must go after any test type flag.
+    cite: >
+      These flags are preceded and followed by a `.` in the filename, and
+      must themselves go after any test type flag, but are otherwise
+      unordered.
+
+  - id: NAME-006
+    source: wpt/docs/writing-tests/file-names.md#L75-L76
+    category: filename
+    applies_to: [testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      `.window`, `.worker`, and `.any` should be immediately followed by the
+      final `.js` extension.
+    cite: >
+      It's preferable that `.window`, `.worker`, and `.any` are immediately
+      followed by their final `.js` extension.
+
+  - id: NAME-007
+    source: wpt/docs/writing-tests/general-guidelines.md#L31-L37
+    category: filename
+    applies_to: [html, js, testharness, reftest]
+    severity: error
+    layer: deterministic
+    rule: |
+      Tests requiring HTTPS must include `.https.` in the filename (e.g.,
+      `test-secure.https.html`), or be the generated service worker test of
+      a `.https`-less `.any` test.
+    cite: >
+      By default, tests are served over plain HTTP. If a test requires HTTPS
+      it must be given a filename containing `.https.`
+
+  - id: NAME-008
+    source: wpt/docs/writing-tests/file-names.md#L58-L62
+    category: filename
+    applies_to: [html, js, testharness, reftest]
+    severity: info
+    layer: semantic
+    rule: |
+      Use `.optional` for tests that assert optional behavior (RFC 2119
+      "MAY"/"OPTIONAL"). Do not use it for "SHOULD"; those can be tested
+      with regular tests, like "MUST".
+    cite: >
+      Indicates that a test makes assertions about optional behavior in a
+      specification, typically marked by the [RFC 2119] "MAY" or "OPTIONAL"
+      keywords. This flag should not be used for "SHOULD".
+
+  - id: NAME-009
+    source: wpt/docs/writing-tests/file-names.md#L64-L74
+    category: filename
+    applies_to: [html, js, testharness, reftest]
+    severity: info
+    layer: semantic
+    rule: |
+      Use `.tentative` for tests asserting behavior not yet required by any
+      specification, or in contradiction to one. It should be apparent in
+      context why the test is tentative and what needs to be resolved.
+      Directories named `tentative` apply this flag recursively.
+    cite: >
+      Indicates that a test makes assertions not yet required by any
+      specification, or in contradiction to some specification. ... It
+      should be apparent in context why the test is tentative and what
+      needs to be resolved to make it non-tentative.
+
+  - id: NAME-010
+    source: wpt/docs/writing-tests/manual.md#L36-L39
+    category: filename
+    applies_to: [manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Manual tests must have filenames of the form `name-manual.ext`
+      (`-manual` suffix immediately before the extension).
+    cite: >
+      Manual tests are distinguished by their filename; all manual tests
+      have filenames of the form `name-manual.ext` (i.e., a `-manual`
+      suffix after the main filename but before the extension).
+
+  # ─── metadata ───────────────────────────────────────────────────────────
+
+  - id: META-001
+    source: wpt/docs/writing-tests/testharness.md#L232-L234
+    category: metadata
+    applies_to: [testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Specify a test title for `.window.js`, `.worker.js`, `.any.js`, or
+      `.extension.js` using `// META: title=Your Title` at the beginning of
+      the file.
+    cite: >
+      Use `// META: title=This is the title of the test` at the beginning
+      of the resource.
+
+  - id: META-002
+    source: wpt/docs/writing-tests/testharness.md#L236-L245
+    category: metadata
+    applies_to: [testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Include external JavaScript files using `// META: script=...` at the
+      beginning of the resource, not by manually wiring up imports.
+    cite: >
+      Use `// META: script=link/to/resource.js` at the beginning of the
+      resource.
+
+  - id: META-003
+    source: wpt/docs/writing-tests/testharness.md#L254-L256
+    category: metadata
+    applies_to: [testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      For tests that exceed the default timeout, use
+      `// META: timeout=long` at the beginning of the resource.
+    cite: >
+      Use `// META: timeout=long` at the beginning of the resource.
+
+  - id: META-004
+    source: wpt/docs/writing-tests/testharness.md#L267-L278
+    category: metadata
+    applies_to: [testharness, html]
+    severity: warn
+    layer: deterministic
+    rule: |
+      For HTML tests with multiple variants, declare each variant with a
+      `<meta name="variant" content="?...">` element. For JS-only tests use
+      `// META: variant=...`.
+    cite: >
+      A test file can have multiple variants by including `meta` elements
+      [example shows `<meta name="variant" content="?default">`].
+
+  # ─── assertions ─────────────────────────────────────────────────────────
+
+  - id: ASSERT-001
+    source: wpt/docs/reviewing-tests/checklist.md#L126-L130
+    category: assertions
+    applies_to: [testharness, js]
+    severity: warn
+    layer: semantic
+    rule: |
+      Use the most specific assert available; avoid `assert_true` for
+      everything. Specific asserts produce significantly better failure
+      messages.
+    cite: >
+      The test uses the most specific asserts possible (e.g. doesn't use
+      `assert_true` for everything).
+
+  - id: ASSERT-002
+    source: wpt/docs/reviewing-tests/checklist.md#L131-L133
+    category: assertions
+    applies_to: [testharness, js, idl]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests of basic IDL-defined behavior should use `idlharness.js` rather
+      than manual existence assertions.
+    cite: >
+      The test uses `idlharness.js` if it is testing basic IDL-defined
+      behavior.
+
+  # ─── async-timing ───────────────────────────────────────────────────────
+
+  - id: ASYNC-001
+    source: wpt/docs/reviewing-tests/checklist.md#L116-L123
+    category: async-timing
+    applies_to: [testharness, js, reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should avoid internal timeouts, since runtime varies across
+      devices. Prefer event-based approaches (waiting for specific events)
+      or two `requestAnimationFrame` calls for rendering-related timing.
+      Timeouts should be a last resort (e.g., `step_timeout()`) and only
+      when event-based alternatives are not feasible.
+    cite: >
+      The test avoids patterns that make it less likely to be stable. In
+      particular, tests should avoid setting internal timeouts ... Instead,
+      tests should prefer event-based approaches (e.g., waiting for specific
+      events) or using two `requestAnimationFrame` calls for rendering-
+      related timing. Timeouts should only be used as a last resort (e.g.,
+      with `step_timeout()`).
+
+  # ─── independence ───────────────────────────────────────────────────────
+
+  - id: INDEP-001
+    source: wpt/docs/reviewing-tests/checklist.md#L109-L114
+    category: independence
+    applies_to: [testharness, js]
+    severity: warn
+    layer: semantic
+    rule: |
+      The number of tests in each file and the test names should be
+      consistent across runs and browsers. Avoid the pattern of a
+      "feature support" test that bails out and skips the rest of the file
+      when the feature is unsupported.
+    cite: >
+      The number of tests in each file and the test names are consistent
+      across runs and browsers. It is best to avoid the pattern where there
+      is a test that asserts that the feature is supported and bails out
+      without running the rest of the tests in the file if it isn't.
+
+  # ─── structure ──────────────────────────────────────────────────────────
+
+  - id: STRUCT-001
+    source: wpt/docs/writing-tests/reftests.md#L25-L29
+    category: structure
+    applies_to: [reftest]
+    severity: error
+    layer: deterministic
+    rule: |
+      A reftest file must contain a `<link>` element with `rel="match"` or
+      `rel="mismatch"` and an `href` attribute pointing to a reference
+      file.
+    cite: >
+      The test file is the one that makes use of the technology being
+      tested. It also contains a `link` element with `rel="match"` or
+      `rel="mismatch"` and `href` attribute pointing to the reference file.
+
+  - id: STRUCT-002
+    source: wpt/docs/writing-tests/reftests.md#L32-L35
+    category: structure
+    applies_to: [reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      The reference file should be as simple as possible and should not use
+      the technology under test. It should render correctly even in UAs
+      with relatively poor CSS support and no support for the technology
+      under test.
+    cite: >
+      The reference file is typically written to be as simple as possible,
+      and does not use the technology under test. It is desirable that the
+      reference be rendered correctly even in UAs with relatively poor
+      support for CSS and no support for the technology under test.
+
+  - id: STRUCT-003
+    source: wpt/docs/reviewing-tests/checklist.md#L85-L88
+    category: structure
+    applies_to: [reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      The reference file should use a different technique from the test, so
+      that a shared bug does not cause the test to fail in the same way
+      (producing a false pass).
+    cite: >
+      The reference file uses a different technique that won't fail in the
+      same way as the test.
+
+  - id: STRUCT-004
+    source: wpt/docs/reviewing-tests/checklist.md#L90-L93
+    category: structure
+    applies_to: [reftest, visual]
+    severity: warn
+    layer: deterministic
+    rule: |
+      The test and reference must render within an 800x600 viewport, only
+      displaying scrollbars if their presence is being tested.
+    cite: >
+      The test and reference render within a 800x600 viewport, only
+      displaying scrollbars if their presence is being tested.
+
+  - id: STRUCT-005
+    source: wpt/docs/writing-tests/reftests.md#L46-L55
+    category: structure
+    applies_to: [reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      References should be shared between tests where possible. Place
+      single-test references using the test name with a `-ref` suffix
+      (e.g., `test.html` → `test-ref.html`). Shared references go in a
+      `references` directory.
+    cite: >
+      References can be shared between tests; this is strongly encouraged
+      ... For references that are applicable only to a single test, it is
+      recommended to use the test name with a suffix of `-ref` as their
+      filename.
+
+  - id: STRUCT-006
+    source: wpt/docs/writing-tests/reftests.md#L62-L65
+    category: structure
+    applies_to: [reftest]
+    severity: info
+    layer: deterministic
+    rule: |
+      With multiple references, the test passes if at least one `match`
+      reference matches AND all `mismatch` references mismatch. Multiple
+      required matches must instead be split into multiple tests.
+    cite: >
+      If a test has multiple links, then the test passes if: If there are
+      any match references, at least one must match, and If there are any
+      mismatch references, all must mismatch.
+
+  - id: STRUCT-007
+    source: wpt/docs/writing-tests/reftests.md#L82-L98
+    category: structure
+    applies_to: [reftest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Reftests requiring DOM manipulation before screenshot must specify
+      `class="reftest-wait"` on the root element, and remove the class once
+      ready (typically in response to the `TestRendered` event).
+    cite: >
+      To enable this, the test may have a `class="reftest-wait"` attribute
+      specified on the root element. In this case the harness will run the
+      following sequence of steps ... Wait for the `reftest-wait` class to
+      be removed from the root element.
+
+  - id: STRUCT-008
+    source: wpt/docs/writing-tests/reftests.md#L100-L127
+    category: structure
+    applies_to: [reftest]
+    severity: info
+    layer: deterministic
+    rule: |
+      When subtle rendering differences (e.g., anti-aliasing) are expected,
+      use `<meta name=fuzzy content="maxDifference=N;totalPixels=M">` (both
+      parameters required).
+    cite: >
+      To allow for these small differences, we allow tests to specify a
+      fuzziness characterised by two parameters, both of which must be
+      specified. ... `<meta name=fuzzy content="maxDifference=15;
+      totalPixels=300">`
+
+  - id: STRUCT-009
+    source: wpt/docs/reviewing-tests/checklist.md#L95-L104
+    category: structure
+    applies_to: [reftest]
+    severity: nit
+    layer: semantic
+    rule: |
+      Reftests should include a self-describing statement that is accurate,
+      precise, simple, and self-explanatory; someone with no technical
+      knowledge should be able to determine pass/fail in seconds.
+    cite: >
+      Nit: The test has a self-describing statement. ... The self-
+      describing statement is accurate, precise, simple, and
+      self-explanatory.
+
+  - id: STRUCT-010
+    source: wpt/docs/writing-tests/manual.md#L40-L52
+    category: structure
+    applies_to: [manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Manual tests must be fully self-describing: include step-by-step
+      instructions for performing the test and a clear statement of how to
+      determine the outcome. Avoid extraneous information (e.g., quotes
+      from the spec) in the rendered page.
+    cite: >
+      A test should have, at a minimum step-by-step instructions for
+      performing the test, and a clear statement of either the test result
+      if it can be automatically determined after some setup or how to
+      otherwise determine the outcome. Any information other than this
+      (e.g., quotes from the spec) should be avoided.
+
+  # ─── api-usage ──────────────────────────────────────────────────────────
+
+  - id: API-001
+    source: wpt/docs/writing-tests/idlharness.md#L6-L8
+    category: api-usage
+    applies_to: [idl, testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      IDL tests should use `.any.js` or `.window.js` to avoid having to
+      write unnecessary boilerplate.
+    cite: >
+      You typically want to use `.any.js` or `.window.js` for this to avoid
+      having to write unnessary boilerplate.
+
+  - id: API-002
+    source: wpt/docs/writing-tests/idlharness.md#L20-L25
+    category: api-usage
+    applies_to: [idl, testharness, js]
+    severity: warn
+    layer: deterministic
+    rule: |
+      IDL tests must include `/resources/WebIDLParser.js` and
+      `/resources/idlharness.js` via `// META: script=...` directives, and
+      typically `// META: timeout=long`.
+    cite: >
+      [Example shows]
+      // META: script=/resources/WebIDLParser.js
+      // META: script=/resources/idlharness.js
+      // META: timeout=long
+
+  - id: API-003
+    source: wpt/docs/writing-tests/idlharness.md#L60-L70
+    category: api-usage
+    applies_to: [idl]
+    severity: warn
+    layer: semantic
+    rule: |
+      In `add_objects`, the interface name must be the *primary* interface
+      of the provided objects, not an ancestor. For example, use
+      `{Document: ["document"]}`, not `{Node: ["document"]}`. Inherited
+      interfaces are tested automatically.
+    cite: >
+      The interface has to be the primary interface of all the objects
+      provided. For example, don't pass `{Node: ["document"]}`, but rather
+      `{Document: ["document"]}`.
+
+  - id: API-004
+    source: wpt/docs/writing-tests/idlharness.md#L72-L76
+    category: api-usage
+    applies_to: [idl]
+    severity: warn
+    layer: semantic
+    rule: |
+      Objects passed to `add_objects` must be safe to call methods on;
+      the harness will invoke methods (including with missing arguments)
+      to verify exception behavior. Ensure provided instances do not
+      cause destructive side-effects.
+    cite: >
+      Warning: methods will be called on any provided objects, in a manner
+      that WebIDL requires be safe. ... If an implementation incorrectly
+      runs the function instead of throwing, this might have side effects,
+      possibly even preventing the test suite from running correctly.
+
+  - id: API-005
+    source: wpt/docs/writing-tests/manual.md#L59-L77
+    category: api-usage
+    applies_to: [manual, testharness]
+    severity: error
+    layer: deterministic
+    rule: |
+      Manual tests that use `testharness.js` must pass
+      `{explicit_timeout: true}` to `setup()` to disable the automatic
+      timeout.
+    cite: >
+      In this case one must pass `{explicit_timeout: true}` in a call to
+      `setup()` in order to disable the automatic timeout of the test.
+
+  # ─── portability ────────────────────────────────────────────────────────
+
+  - id: PORT-001
+    source: wpt/docs/writing-tests/general-guidelines.md#L160-L167
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Tests must not depend on external network resources. When multiple
+      hosts are needed, use the known set of subdomains and the text
+      substitution features of wptserve.
+    cite: >
+      Tests must not depend on external network resources. When these
+      tests are run on CI systems, they are typically configured with
+      access to external resources disabled, so tests that try to access
+      them will fail.
+
+  - id: PORT-002
+    source: wpt/docs/writing-tests/general-guidelines.md#L146-L157
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should be cross-platform — working across different devices,
+      screen resolutions, and paper sizes. Anything beyond the documented
+      assumptions belongs in a manual test that documents them.
+    cite: >
+      Tests should be as cross-platform as reasonably possible, working
+      across different devices, screen resolutions, paper sizes, etc. The
+      assumptions that can be relied on are documented [here]; tests that
+      rely on anything else should be manual tests that document their
+      assumptions.
+
+  - id: PORT-003
+    source: wpt/docs/writing-tests/general-guidelines.md#L154-L157
+    category: portability
+    applies_to: [reftest, visual, css]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Fonts cannot be relied on to be installed or to have specific
+      metrics. When a known font is needed, use Ahem loaded as a web font;
+      in other cases use `@font-face`.
+    cite: >
+      Fonts cannot be relied on to be either installed or to have specific
+      metrics. As such, in most cases when a known font is needed, Ahem
+      should be used and loaded as a web font.
+
+  - id: PORT-004
+    source: wpt/docs/writing-tests/assumptions.md#L6-L8
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests may assume viewport dimensions of at least 800x600px, a
+      full-color device, and no UA-imposed minimum font size.
+    cite: >
+      The device is a full-color device. The device has viewport
+      dimensions of at least 800px by 600px. The UA imposes no minimum
+      font size.
+
+  - id: PORT-005
+    source: wpt/docs/writing-tests/assumptions.md#L9-L12
+    category: portability
+    applies_to: [reftest, visual, css]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests may assume `medium` font-size computes to 16px, canvas
+      background is white, the initial value of `color` is black, and the
+      user stylesheet is empty (except where indicated by the tests).
+    cite: >
+      The `medium` `font-size` computes to 16px. The canvas background is
+      `white`. The initial value of `color` is `black`. The user
+      stylesheet is empty (except where indicated by the tests).
+
+  # ─── focus ──────────────────────────────────────────────────────────────
+
+  - id: FOCUS-001
+    source: wpt/docs/writing-tests/general-guidelines.md#L99-L106
+    category: focus
+    applies_to: [html, js, testharness, reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should be as short as possible. Extraneous elements on the
+      page should be avoided so it is clear what is part of the test.
+      For reftests at 800x600, scrollbars must be avoided unless
+      scrolling itself is being tested.
+    cite: >
+      Tests should be as short as possible. For reftests in particular
+      scrollbars at 800x600px window size must be avoided unless scrolling
+      behavior is specifically being tested. For all tests extraneous
+      elements on the page should be avoided so it is clear what is part
+      of the test.
+
+  - id: FOCUS-002
+    source: wpt/docs/writing-tests/general-guidelines.md#L109-L127
+    category: focus
+    applies_to: [html, js, testharness, reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should avoid depending on edge-case behavior of features they
+      don't intend to test, and should not contain parse errors (except
+      where parsing is the subject). Tests should not rely on features
+      that aren't supported in the latest stable release of Safari,
+      Chrome, and Firefox unless that feature is the one being tested.
+    cite: >
+      Tests should generally avoid depending on edge case behavior of
+      features that they don't explicitly intend on testing. ... Tests
+      should not rely on unrelated features if doing so causes failures in
+      the latest stable release of Apple Safari, Google Chrome, or Mozilla
+      Firefox.
+
+  - id: FOCUS-003
+    source: wpt/docs/writing-tests/general-guidelines.md#L170-L174
+    category: focus
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should be self-describing: it should be obvious when they
+      pass and when they fail without consulting the specification.
+    cite: >
+      Tests should make it obvious when they pass and when they fail. It
+      shouldn't be necessary to consult the specification to figure out
+      whether a test has passed of failed.
+
+  - id: FOCUS-004
+    source: wpt/docs/writing-tests/general-guidelines.md#L121-L127
+    category: focus
+    applies_to: [html, js, testharness, reftest]
+    severity: warn
+    layer: semantic
+    rule: |
+      Tests should pass when the feature under test exposes the expected
+      behavior, and fail when the feature is not implemented or
+      implemented incorrectly.
+    cite: >
+      Tests should pass when the feature under test exposes the expected
+      behavior, and they should fail when the feature under test is not
+      implemented or is implemented incorrectly.
+
+  - id: FOCUS-005
+    source: wpt/docs/writing-tests/manual.md#L6-L13
+    category: focus
+    applies_to: [manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Manual tests should be a last resort; automated tests are
+      significantly more useful for catching regressions. Use a manual
+      test only when automation is not yet possible.
+    cite: >
+      Whenever possible it's best to write a fully automated test. ... This
+      makes them [manual tests] significantly less useful for catching
+      regressions than automated tests.
+
+  # ─── review ─────────────────────────────────────────────────────────────
+
+  - id: REV-001
+    source: wpt/docs/reviewing-tests/checklist.md#L42-L45
+    category: review
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      The test must not use external resources.
+    cite: >
+      The test does not use external resources.
+
+  - id: REV-002
+    source: wpt/docs/reviewing-tests/checklist.md#L46-L49
+    category: review
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      The test must not use proprietary features (vendor-prefixed or
+      otherwise) unless those features are themselves the subject of the
+      test.
+    cite: >
+      The test does not use proprietary features (vendor-prefixed or
+      otherwise).
+
+  - id: REV-003
+    source: wpt/docs/reviewing-tests/checklist.md#L50-L53
+    category: review
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: deterministic
+    rule: |
+      The test must not contain commented-out code.
+    cite: >
+      The test does not contain commented-out code.
+
+  - id: REV-004
+    source: wpt/docs/reviewing-tests/checklist.md#L62-L66
+    category: review
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: semantic
+    rule: |
+      If the test needs code running on the server side, the server code
+      must be written in Python, and must not do anything potentially
+      unsafe.
+    cite: >
+      If the test needs code running on the server side, the server code
+      must be written in Python, and the Python code must not do anything
+      potentially unsafe.
+
+  - id: REV-005
+    source: wpt/docs/reviewing-tests/checklist.md#L73-L75
+    category: review
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: nit
+    layer: semantic
+    rule: |
+      The test title should be descriptive but not too wordy.
+    cite: >
+      Nit: The title is descriptive but not too wordy.
+
+  - id: REV-006
+    source: wpt/docs/reviewing-tests/checklist.md#L135-L137
+    category: review
+    applies_to: [testharness, js]
+    severity: nit
+    layer: deterministic
+    rule: |
+      Tests in a single file should be separated by one empty line.
+    cite: >
+      Nit: Tests in a single file are separated by one empty line.
+
+  - id: REV-007
+    source: wpt/docs/reviewing-tests/checklist.md#L140-L160
+    category: review
+    applies_to: [visual]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Visual tests should render to a fixed, static page with no
+      animation, within an 800x600 viewport.
+    cite: >
+      The test renders within a 800x600 viewport, only displaying
+      scrollbars if their presence is being tested. The test renders to a
+      fixed, static page with no animation.
