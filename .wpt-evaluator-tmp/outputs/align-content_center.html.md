@@ -1,146 +1,237 @@
+# Evaluation: css/css-flexbox/align-content_center.html
+
 ## Input scope
 
-| File                                              |    Bytes |
-| ------------------------------------------------- | -------: |
-| wptgen/skills/wpt-evaluator/SKILL.md              |    4,002 |
-| wptgen/skills/wpt-evaluator/references/rules.yaml |   50,132 |
-| ../wpt/css/css-flexbox/align-content_center.html  |      968 |
-| **Total**                                         | **55,102** |
+| File                                                                              |     Bytes | Role        |
+| --------------------------------------------------------------------------------- | --------: | ----------- |
+| wptgen/skills/wpt-evaluator/SKILL.md                                              |     7,475 | skill       |
+| wptgen/skills/wpt-evaluator/references/rules.yaml                                 |    50,132 | rules       |
+| ../wpt/css/css-flexbox/align-content_center.html                                  |       968 | test        |
+| ../wpt/css/css-flexbox/reference/align-content_center-ref.html                    |       580 | dependency  |
+| ../wpt/css/css-flexbox/support/test-style.css                                     |       342 | dependency  |
+| **Total**                                                                         | **59,497** |             |
+
+Declared dependencies (not read): none classified as framework or external. The
+only external-style URLs are `<link rel="author" href="http://www.intel.com">`
+and `<link rel="help" href="http://www.w3.org/TR/css-flexbox-1/#align-content-property">`
+which are metadata URLs, not loaded resources.
+
+Local dependencies read:
+- `reference/align-content_center-ref.html` — read to evaluate STRUCT-002 and
+  STRUCT-003 (whether the reference uses the technology under test and whether
+  it uses a different technique).
+- `support/test-style.css` — read to evaluate STRUCT-013/STRUCT-014 (the test's
+  prose mentions a "red rectangle" with no red declared in the test file
+  itself, so the shared stylesheet had to be inspected to confirm whether the
+  rendering convention is met).
 
 Approach: distilled-yaml
-Approximate input tokens: ~13,776
-Total session tokens: 58.4k
+Approximate input tokens: ~14,874
+Total session usage: 61.2k
 
-## Test classification
+## Detected test kind
 
-- **Kind**: reftest (has `<link rel="match">`)
-- **Format**: HTML
-- **Category**: CSS (under `css/css-flexbox/`)
-- **Applies-to filters**: `reftest`, `html`, `css`
+- `reftest` (has `<link rel="match" href="reference/align-content_center-ref.html">`)
+- `css` (lives under `css/css-flexbox/`)
+- `html`
+
+Not testharness, not manual, not crashtest, not visual, not idl, not wdspec.
 
 ## Findings
 
-### FMT-001 — file-format — error (deterministic)
-- **Line**: 1–3 (head region)
-- **Evidence**: No `<meta charset="utf-8">` declared in the file.
-- **Rule**: Files must be encoded in UTF-8. In HTML, where UTF-8 is not the default encoding, files must contain `<meta charset=utf-8>` or be pure ASCII.
-- **Source**: wpt/docs/writing-tests/general-guidelines.md#L82-L87
-- **Note**: The file appears to be pure ASCII (no non-ASCII characters present), so this may be compliant by the ASCII clause. However, explicit `<meta charset>` is the safer convention.
+### STRUCT-002 — warn — reference uses the technology under test (partially)
 
-### STRUCT-001 — structure — error (deterministic) — PASS
-- **Line**: 7
-- **Evidence**: `<link rel="match" href="reference/align-content_center-ref.html">`
-- **Rule**: A reftest file must contain a `<link rel="match"|"mismatch">` with an `href`.
-- **Source**: wpt/docs/writing-tests/reftests.md#L25-L29
-- **Status**: Satisfied. (Listed for completeness; no issue.)
+- Line: [reference/align-content_center-ref.html:7-15](../../../wpt/css/css-flexbox/reference/align-content_center-ref.html#L7-L15)
+- Evidence (reference file, lines 7-15):
+  ```
+  #test {
+    height: 200px;
+    width: 80px;
+  }
+  #spacer {
+    width: 50px;
+    height: 25px;
+  }
+  ```
+- The reference avoids `display: flex` / `align-content` (good — the technology
+  under test is not used). However the reference depends on the shared
+  stylesheet `support/test-style.css`, which sets `width: 50px; height: 50px`
+  on `#test01..#test03` — three 50px boxes inside an 80px-wide container will
+  visually stack in normal block flow only because each box's width is less
+  than the container width. The reference's vertical centering is produced by
+  a 25px-tall `#spacer` block above the three 50px boxes (25 + 150 = 175, with
+  25px slack below) — this is a legitimate non-flexbox technique. The rule is
+  largely satisfied, but flagged as a soft warn because the reference's
+  correctness depends on shared stylesheet rules that are also consumed by the
+  test, making the reference less robust than one that re-declared its own
+  styles inline.
+- Source: `wpt/docs/writing-tests/reftests.md#L32-L35`
 
-### STRUCT-005 — structure — warn (semantic)
-- **Line**: 7
-- **Evidence**: `<link rel="match" href="reference/align-content_center-ref.html">`
-- **Rule**: Single-test references should use the test name with a `-ref` suffix, in the same directory; shared references go in a `references` directory.
-- **Source**: wpt/docs/writing-tests/reftests.md#L46-L55
-- **Issue**: The reference is placed in a sibling `reference/` (singular) directory rather than the conventional `references/` (plural) shared directory, *or* alongside the test as `align-content_center-ref.html`. The filename suffix convention (`-ref`) is respected, but the directory name (`reference/`) does not match either documented pattern.
+### STRUCT-003 — info — reference uses a different technique
 
-### STRUCT-009 — structure — nit (semantic)
-- **Line**: 21–23
-- **Evidence**: `Test passes if: 1. the rectangle 1, 2, 3 show up in a vertical column in a red rectangle and no gap between them. 2. the rectangle 1, 2, 3 appear in middle left of red rectangle.`
-- **Rule**: Reftests should include a self-describing statement that is accurate, precise, simple, and self-explanatory.
-- **Source**: wpt/docs/reviewing-tests/checklist.md#L95-L104
-- **Issue**: A self-describing statement is present, but for a reftest the harness compares to a reference image — the human-readable pass criteria is supplementary. The phrasing is acceptable but somewhat awkward ("the rectangle 1, 2, 3 show up", "middle left of red rectangle"). Grammar (singular/plural) and color reference ("red rectangle" — no red is established in this file's CSS) reduce clarity.
+- Line: [reference/align-content_center-ref.html:21](../../../wpt/css/css-flexbox/reference/align-content_center-ref.html#L21)
+- Evidence: reference uses normal block layout with a 25px `#spacer` div to
+  push the three 50px boxes downward, achieving centering without flexbox.
+  The test uses `display: flex; flex-wrap: wrap; align-content: center`.
+- This is reported as an `info`-level satisfaction rather than a violation —
+  the different-technique requirement is met.
+- Source: `wpt/docs/reviewing-tests/checklist.md#L85-L88`
 
-### STRUCT-013 — structure — warn (semantic)
-- **Line**: 10–18 (style), 20–25 (body)
-- **Evidence**: The test uses no green/red color convention. The flex container has only `height: 200px; width: 80px; display: flex; flex-wrap: wrap; align-content: center;` with no background color, and items have no styling visible in this file (presumably from `support/test-style.css`).
-- **Rule**: Rendering tests should indicate success with a recognizable visual pattern — typically a green paragraph or green square, often over red so misalignment exposes red.
-- **Source**: wpt/docs/writing-tests/rendering.md#L8-L24
-- **Issue**: The instruction text refers to a "red rectangle" but the test file itself defines no red background. Color cues (if any) come from the external `support/test-style.css` stylesheet, making the rendering convention non-obvious from the test file alone. For a reftest, the convention is less critical than for a visual test (since comparison is automated), but the rendering-test guidelines still apply.
+### STRUCT-009 — nit — self-describing statement is imprecise
 
-### STRUCT-014 — structure — warn (semantic)
-- **Line**: 10–18
-- **Evidence**: Test CSS does not encode failure as a visually obvious pattern (e.g., red exposed, "FAIL" text, overlapping text).
-- **Rule**: Rendering tests should be designed so failures are visually obvious.
-- **Source**: wpt/docs/writing-tests/rendering.md#L37-L59
-- **Issue**: Same as STRUCT-013 — without seeing `support/test-style.css`, this file alone gives no failure-exposing visual design. For an automated reftest this is mitigated by the reference comparison, but the instruction text refers to a red rectangle that isn't established in this file.
+- Line: [align-content_center.html:21-23](../../../wpt/css/css-flexbox/align-content_center.html#L21-L23)
+- Evidence:
+  ```
+  <p>Test passes if:<br>
+  1. the rectangle 1, 2, 3 show up in a vertical column in a red rectangle and no gap between them.<br>
+  2. the rectangle 1, 2, 3 appear in middle left of red rectangle.</p>
+  ```
+- "middle left of red rectangle" is vague — a reviewer cannot tell from this
+  text alone what the exact pass condition is without knowing the dimensions
+  of the red rectangle. "Vertical column" plus "middle left" is also
+  redundant for an 80px container holding 50px boxes. The statement is
+  understandable but not precise; "the three rectangles are vertically
+  centered within the red rectangle" would be clearer.
+- Source: `wpt/docs/reviewing-tests/checklist.md#L95-L104`
 
-### META-005 — metadata — error (deterministic) — PASS
-- **Line**: 6
-- **Evidence**: `<link rel="help" href="http://www.w3.org/TR/css-flexbox-1/#align-content-property" />`
-- **Rule**: CSS tests REQUIRE at least one `<link rel="help" href="...">`.
-- **Source**: wpt/docs/writing-tests/css-metadata.md#L5-L12
-- **Status**: Satisfied.
+### STRUCT-013 — warn — rendering does not use the canonical green-square / red-fail convention
 
-### META-006 — metadata — warn (semantic) — PASS
-- **Line**: 6
-- **Evidence**: `<link rel="help" href="http://www.w3.org/TR/css-flexbox-1/#align-content-property" />`
-- **Rule**: Spec links should target relevant sections; primary section first.
-- **Source**: wpt/docs/writing-tests/css-metadata.md#L16-L25
-- **Status**: Single link to a fragment-anchored, specific section. Satisfied.
+- Line: [align-content_center.html:11-17](../../../wpt/css/css-flexbox/align-content_center.html#L11-L17) and shared stylesheet `support/test-style.css`
+- Evidence: the three test boxes are colored chartreuse (`#7FFF00`), cyan
+  (`#00FFFF`), and royal blue (`#4169E1`) on a red (`#ff0000`) container. The
+  rendering test guideline recommends using green to indicate pass and red to
+  expose failures.
+- This is a reftest, so pass/fail is determined by image comparison rather
+  than by color convention; the rule is a soft guideline for tests where
+  visual readability matters. Reported as `warn` because the test deviates
+  from the convention but is still functional.
+- Source: `wpt/docs/writing-tests/rendering.md#L8-L24`
 
-### META-007 — metadata — warn (semantic)
-- **Line**: 9
-- **Evidence**: `<meta name="assert" content="Check if the web engine can identify the align-content value center." />`
-- **Rule**: `<meta name="assert">` must not duplicate the title, the verification instructions, the suite, or a spec line.
-- **Source**: wpt/docs/writing-tests/css-metadata.md#L156-L168
-- **Issue**: The assertion is weakly phrased ("Check if the web engine can identify...") — it describes a meta-action rather than the property/value behavior under test. While not a literal duplicate of the title, it conveys roughly the same information as the title (`align-content_center`) with little added specificity. A stronger assertion would describe the expected layout effect (e.g., "When `align-content: center` is applied to a multi-line flex container, the flex lines are centered along the cross axis").
+### FOCUS-003 / STRUCT-009 — warn — instructions describe a pass condition for a manual viewer, not for reftest comparison
 
-### PORT-003 — portability — warn (deterministic)
-- **Line**: 24
-- **Evidence**: `<div id=test><div id=test01>1</div><div id=test02>2</div><div id=test03>3</div></div>` — renders digits "1", "2", "3" using the UA's default font.
-- **Rule**: Fonts cannot be relied on to be installed or to have specific metrics. When a known font is needed, use Ahem loaded as a web font.
-- **Source**: wpt/docs/writing-tests/general-guidelines.md#L154-L157
-- **Issue**: The test displays text ("1", "2", "3") in flex items without specifying a font. If the reference also uses a default font, the comparison may be acceptable, but cross-platform font-metric variation could affect layout (item baseline, item height with `flex-wrap: wrap`). Using Ahem would make the comparison robust.
+- Line: [align-content_center.html:21-23](../../../wpt/css/css-flexbox/align-content_center.html#L21-L23)
+- Evidence: the test contains step-by-step pass instructions ("Test passes
+  if: 1. ... 2. ...") that look like manual-test instructions. The same text
+  also appears in the reference file (lines 18-20 of the reference). For a
+  reftest, the pass condition is "test image matches reference image", so
+  these instructions are decorative — they are not consulted by the reftest
+  runner. They are not incorrect, but their presence in a reftest is
+  unusual and can confuse a reader into thinking the test is manual.
+- Source: `wpt/docs/writing-tests/general-guidelines.md#L170-L174`
 
-### PORT-005 — portability — warn (semantic) — informational
-- **Line**: N/A
-- **Evidence**: Test relies on default `color: black` text on default canvas background.
-- **Rule**: Tests may assume `medium` font-size = 16px, canvas background white, initial color black, empty user stylesheet.
-- **Source**: wpt/docs/writing-tests/assumptions.md#L9-L12
-- **Status**: Within the assumed envelope. No finding.
+### META-007 — info — `<meta name="assert">` content overlaps with title
 
-### FOCUS-001 — focus — warn (semantic)
-- **Line**: 21–23, 24
-- **Evidence**: The visible page content is the multi-line instruction paragraph plus the 80×200 flex container with digits 1/2/3.
-- **Rule**: Tests should be as short as possible; extraneous page elements should be avoided so it is clear what is part of the test.
-- **Source**: wpt/docs/writing-tests/general-guidelines.md#L99-L106
-- **Issue**: For a reftest, the human-readable instruction paragraph (`<p>Test passes if: ...</p>`) appears in the test viewport and will be part of the screenshot compared against the reference. If the reference also renders this paragraph, that's fine; if not, the instruction text contributes to the rendering area. Reftests typically rely on the rendered output alone — long instruction text on the test page is uncommon and risks pushing the actual test region or affecting layout.
+- Line: [align-content_center.html:4](../../../wpt/css/css-flexbox/align-content_center.html#L4) and [align-content_center.html:9](../../../wpt/css/css-flexbox/align-content_center.html#L9)
+- Evidence:
+  - Title (line 4): `CSS Flexible Box Test: align-content_center`
+  - Assert (line 9): `Check if the web engine can identify the align-content value center.`
+- The assert text is not literally a copy of the title, but is a near-paraphrase
+  ("align-content_center" ↔ "align-content value center"). It does not add
+  significant information beyond the title.
+- Source: `wpt/docs/writing-tests/css-metadata.md#L156-L168`
 
-### FOCUS-003 — focus — warn (semantic)
-- **Line**: 21–23
-- **Evidence**: `Test passes if: 1. the rectangle 1, 2, 3 show up in a vertical column in a red rectangle and no gap between them. 2. the rectangle 1, 2, 3 appear in middle left of red rectangle.`
-- **Rule**: Tests should be self-describing; obvious when they pass/fail without consulting the spec.
-- **Source**: wpt/docs/writing-tests/general-guidelines.md#L170-L174
-- **Issue**: The self-describing text mentions a "red rectangle" but no red is defined in this file. The reader must inspect `support/test-style.css` or the rendered output to understand the pass condition. The phrasing also has grammatical issues ("the rectangle 1, 2, 3 show up", "appear in middle left of red rectangle").
+### FMT-001 — info — no `<meta charset>` declared (file is pure ASCII, so compliant)
 
-### REV-001 — review — error (deterministic) — PASS
-- **Line**: 5, 6, 7, 8
-- **Evidence**: References are to `http://www.intel.com` (author link only, not loaded), the W3C spec (`rel="help"`, not loaded), and local `reference/` and `support/` paths.
-- **Rule**: Test must not use external resources.
-- **Source**: wpt/docs/reviewing-tests/checklist.md#L42-L45
-- **Status**: The `rel="author"` and `rel="help"` URLs are metadata, not loaded resources. Stylesheet and reference are local. Satisfied.
+- Line: [align-content_center.html:1-19](../../../wpt/css/css-flexbox/align-content_center.html#L1-L19)
+- Evidence: the file declares no `<meta charset="utf-8">`. The file contains
+  only ASCII characters, so the rule's "or be pure ASCII" clause is satisfied.
+  Listed as `info` for traceability, not a violation.
+- Source: `wpt/docs/writing-tests/general-guidelines.md#L82-L87`
 
-### NAME-002 — filename — nit (semantic)
-- **Line**: filename
-- **Evidence**: `align-content_center.html`
-- **Rule**: File names should be descriptive; common format is `test-topic-001.html` (hyphen-separated, padded integer).
-- **Source**: wpt/docs/writing-tests/general-guidelines.md#L15-L22
-- **Issue**: The filename is descriptive but mixes hyphens and underscores (`align-content_center` instead of `align-content-center`). Not strictly required, but the convention favors hyphens throughout.
+### META-005 — info — satisfied
 
-### NAME-001 — filename — error (deterministic) — PASS
-- **Evidence**: Path `css/css-flexbox/align-content_center.html` (38 chars relative to test root).
-- **Rule**: < 150 characters.
-- **Status**: Satisfied.
+- Line: [align-content_center.html:6](../../../wpt/css/css-flexbox/align-content_center.html#L6)
+- Evidence: `<link rel="help" href="http://www.w3.org/TR/css-flexbox-1/#align-content-property" />`
+- The CSS-test requirement of at least one `<link rel="help">` is met.
+- Source: `wpt/docs/writing-tests/css-metadata.md#L5-L12`
 
-## Indentation / formatting observation (not a rule violation)
+### STRUCT-001 — info — satisfied
 
-- **Lines 12–17**: The style block mixes tabs and spaces for indentation (tabs on lines 12, 15, 16, 17; spaces on 13, 14). Cosmetic; no rule covers this.
+- Line: [align-content_center.html:7](../../../wpt/css/css-flexbox/align-content_center.html#L7)
+- Evidence: `<link rel="match" href="reference/align-content_center-ref.html">`
+- Reftest link element is present and points to an existing reference file.
+- Source: `wpt/docs/writing-tests/reftests.md#L25-L29`
 
-## Files read in service of the evaluation
+### STRUCT-005 — info — reference naming follows convention
 
-| File                                              | Bytes  |
-| ------------------------------------------------- | -----: |
-| wptgen/skills/wpt-evaluator/SKILL.md              |  4,002 |
-| wptgen/skills/wpt-evaluator/references/rules.yaml | 50,132 |
-| ../wpt/css/css-flexbox/align-content_center.html  |    968 |
-| **Total**                                         | **55,102** |
+- Line: [align-content_center.html:7](../../../wpt/css/css-flexbox/align-content_center.html#L7)
+- Evidence: reference path is `reference/align-content_center-ref.html`. The
+  test is `align-content_center.html`, and the reference uses a `-ref` suffix
+  and lives in a `reference/` directory. The recommendation says single-test
+  references use the test name plus `-ref`. Convention satisfied.
+- Source: `wpt/docs/writing-tests/reftests.md#L46-L55`
 
-Note: `support/test-style.css` and `reference/align-content_center-ref.html` were referenced by the test file but not opened — their existence was verified by directory listing only. Several findings (STRUCT-013, STRUCT-014, FOCUS-001) would benefit from inspecting those files but were issued based on what the test file alone discloses.
+### NAME-002 — nit — filename uses underscore separator inconsistent with WPT convention
+
+- Line: filename
+- Evidence: `align-content_center.html`. WPT's filename convention prefers
+  hyphenated descriptive names (e.g., `align-content-center.html` or
+  `align-content-center-001.html`). Mixing a hyphen and an underscore in the
+  same name is unusual and inconsistent with the documented
+  `test-topic-001.html` pattern.
+- Source: `wpt/docs/writing-tests/general-guidelines.md#L15-L22`
+
+### PORT-004 — info — viewport assumption met implicitly
+
+- Test fits well within an 800x600 viewport (container is 200x80). Satisfied.
+- Source: `wpt/docs/writing-tests/assumptions.md#L6-L8`
+
+## Rules considered but not flagged
+
+The following applicable rules were evaluated and produced no finding:
+
+- FMT-001 (file format / encoding) — listed above as info.
+- META-005, META-006 (help link presence and ordering) — single help link
+  present; ordering is trivially satisfied.
+- STRUCT-004 (800x600 viewport) — satisfied; test is 80x200.
+- STRUCT-006 (multiple-references semantics) — only one reference declared.
+- STRUCT-007 (`reftest-wait`) — no DOM manipulation needed; not applicable.
+- STRUCT-008 (`fuzzy`) — not declared; only needed when anti-aliasing differs.
+- API-006..API-009 (testdriver) — testdriver not used.
+- PORT-001 / REV-001 (external resources) — only the `<link rel="help">` and
+  `<link rel="author">` URLs are external; these are metadata, not loaded.
+- PORT-003 (fonts) — no custom fonts; only plain digit glyphs in the test boxes.
+- PORT-006 (hostnames/ports) — no server URLs hardcoded.
+- REV-002 (proprietary features) — none used.
+- REV-003 (commented-out code) — none.
+- FOCUS-001 (shortness) — test is short and minimal.
+- FOCUS-004 (passes when implemented correctly, fails otherwise) — the test
+  is constructed such that `align-content: center` produces the centered
+  layout that matches the reference; a UA without flexbox support, or one
+  that does not implement `align-content: center`, will produce a different
+  layout and fail the image comparison. Satisfied.
+
+## Notes on rubric calibration
+
+Issues worth tracking for future rubric refinement:
+
+1. **STRUCT-002 borderline**: The current rule text says the reference
+   "should not use the technology under test". The reference here doesn't —
+   but it depends on a shared stylesheet that is also used by the test. The
+   rubric may want a sub-rule about whether dependency sharing between test
+   and reference is acceptable, or whether references should re-declare their
+   own styles to remain robust if the test stylesheet changes.
+
+2. **Reftest vs. manual-style prose**: The "Test passes if:" instructions in
+   both test and reference are leftover from a manual-test style of writing,
+   even though this is a reftest. The rubric currently has no rule that
+   specifically calls out "reftest contains manual-test instructions" — it
+   gets flagged here under FOCUS-003 / STRUCT-009 but is really a distinct
+   anti-pattern worth its own rule.
+
+3. **NAME-002 specificity**: The rule discourages "very generic names like
+   `001.html`" and mentions a `test-topic-001.html` format, but does not
+   explicitly forbid underscore-vs-hyphen mixing. The filename
+   `align-content_center.html` is descriptive (so the rule's primary
+   concern is met), and the underscore-vs-hyphen objection is a stylistic
+   inference. Worth tightening if WPT enforces hyphens-only.
+
+4. **No rule for "self-test of UA capability"**: The test relies on the UA
+   actually implementing flexbox to fail correctly. If a UA renders
+   `display: flex` as `display: block`, the three 50px boxes will still
+   stack vertically (because they exceed the 80px container width) but
+   will not be vertically centered — so the test would still fail in that
+   case. The test passes when implemented correctly and fails otherwise,
+   which satisfies FOCUS-004, but the analysis to confirm this is
+   non-trivial. A rule prompting reviewers to verify the failure mode
+   explicitly might be useful.

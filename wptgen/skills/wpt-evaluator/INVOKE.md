@@ -30,22 +30,27 @@ In a fresh conversation, paste a prompt of the following shape. Replace
 ```
 Evaluate the WPT test file at <path> using the wpt-evaluator skill.
 
-1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric.
+1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric and the
+   dependency-reading rules.
 2. Read the test file at <path>.
 3. Detect the test kind from the filename and contents (testharness,
    reftest, manual, crashtest, visual, idl, wdspec, etc.).
 4. Load rules from wptgen/skills/wpt-evaluator/references/rules.yaml,
    filtering to those whose `applies_to` includes the detected kind
    (plus matching `html`/`js`/`css` etc. based on file content).
-5. Evaluate the test file against each applicable rule.
-6. Produce findings in the format specified by SKILL.md:
+5. Detect declared dependencies in the test file (script src, link
+   href, // META: script, etc.). List them, classify each as
+   framework/external/local, and read local dependencies ONLY when
+   SKILL.md's "When to read a local dependency" criteria apply.
+6. Evaluate the test file against each applicable rule.
+7. Produce findings in the format specified by SKILL.md:
    - Rule ID, severity, line reference, evidence quote, source citation.
    - No composite score. No proposed fixes.
-7. As you work, track every file you read in service of the evaluation.
+8. As you work, track every file you read in service of the evaluation.
    For each file: its path and its byte size (use `wc -c <path>` or
    equivalent). Do NOT count files you only touched to navigate (e.g.,
    directory listings, this INVOKE.md, files referenced but not opened).
-8. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
+9. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
    <filename> matches the input filename with `.md` appended. Prepend
    an "Input scope" section to the report (format below).
 ```
@@ -67,16 +72,25 @@ output. Sum the bytes column at the bottom.
 ```markdown
 ## Input scope
 
-| File                                              |    Bytes |
-| ------------------------------------------------- | -------: |
-| wptgen/skills/wpt-evaluator/SKILL.md              |    4,002 |
-| wptgen/skills/wpt-evaluator/references/rules.yaml |   26,341 |
-| <path to test file under evaluation>              |    3,128 |
-| **Total**                                         | **33,471** |
+| File                                              |    Bytes | Role         |
+| ------------------------------------------------- | -------: | ------------ |
+| wptgen/skills/wpt-evaluator/SKILL.md              |    4,002 | skill        |
+| wptgen/skills/wpt-evaluator/references/rules.yaml |   26,341 | rules        |
+| <path to test file under evaluation>              |    3,128 | test         |
+| <path to dependency that was read>                |      812 | dependency   |
+| **Total**                                         | **NN,NNN** |              |
 
+Declared dependencies (not read): /resources/testharness.js,
+/resources/testharnessreport.js, https://example.org/foo.js
 Approach: distilled-yaml          # or tagged-docs, prose-direct, etc.
-Approximate input tokens: ~8,400  # bytes ÷ 4
+Approximate input tokens: ~NN,NNN # bytes ÷ 4
 ```
+
+The `Role` column distinguishes the skill, the rules corpus, the test
+file, and any dependencies that were actually read. List dependencies
+that were detected but NOT read (framework + external) on the line
+below the table so the cost of "considered but skipped" is also
+visible.
 
 The "Approach" tag lets later A/B comparisons group reports by evaluator
 design. Use a short stable label per approach.
