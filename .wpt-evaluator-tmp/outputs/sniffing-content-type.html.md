@@ -38,6 +38,8 @@ Approximate input tokens: ~11,807
 **Source citation**: `wpt/docs/writing-tests/general-guidelines.md:L172-L175` (Be Self-Describing section); `wpt/docs/reviewing-tests/checklist.md:L34-L36`
 **Summary**: Tests should make it obvious what specification behavior they verify; a `<link rel="help">` pointing to the relevant spec section is the standard way to express this and is expected by reviewers.
 
+==Engineer Note: This seems to be a misinterpration of the original docs==  
+
 ---
 
 ### 3. Synchronous assertion on an asynchronous side-effect — likely false-passing test
