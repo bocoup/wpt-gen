@@ -41,13 +41,61 @@ Evaluate the WPT test file at <path> using the wpt-evaluator skill.
 6. Produce findings in the format specified by SKILL.md:
    - Rule ID, severity, line reference, evidence quote, source citation.
    - No composite score. No proposed fixes.
-7. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
-   <filename> matches the input filename with `.md` appended.
+7. As you work, track every file you read in service of the evaluation.
+   For each file: its path and its byte size (use `wc -c <path>` or
+   equivalent). Do NOT count files you only touched to navigate (e.g.,
+   directory listings, this INVOKE.md, files referenced but not opened).
+8. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
+   <filename> matches the input filename with `.md` appended. Prepend
+   an "Input scope" section to the report (format below).
 ```
 
 If the file path is relative to a directory you've cloned alongside (e.g.,
 `../wpt/css/css-flexbox/flex-direction-001.html`), pass that path as-is —
 the agent has read access to sibling directories.
+
+## Input scope section format
+
+The findings report must begin with an Input scope section recording what
+was loaded into context during the evaluation. This makes it possible to
+compare the corpus weight of different evaluator designs (e.g., distilled
+YAML vs. tagged upstream docs).
+
+Use this template, replacing the example numbers with actual `wc -c`
+output. Sum the bytes column at the bottom.
+
+```markdown
+## Input scope
+
+| File                                              |    Bytes |
+| ------------------------------------------------- | -------: |
+| wptgen/skills/wpt-evaluator/SKILL.md              |    4,002 |
+| wptgen/skills/wpt-evaluator/references/rules.yaml |   26,341 |
+| <path to test file under evaluation>              |    3,128 |
+| **Total**                                         | **33,471** |
+
+Approach: distilled-yaml          # or tagged-docs, prose-direct, etc.
+Approximate input tokens: ~8,400  # bytes ÷ 4
+```
+
+The "Approach" tag lets later A/B comparisons group reports by evaluator
+design. Use a short stable label per approach.
+
+After the Input scope section, continue with the findings as specified
+by SKILL.md.
+
+## What Input scope can and can't tell you
+
+It captures: the corpus the evaluator chose to load.
+
+It does NOT capture: system prompt, tool-call overhead, the agent's
+internal reasoning, or anything the harness loaded outside the agent's
+control. Treat the byte total as a **lower bound** on real input tokens,
+and as a **directly comparable** signal between approaches that both
+under-count by the same overhead.
+
+For the conversation-wide actual token count, use Claude Code's
+`/cost` command at the end of the session.
 
 ## What to look for during validation
 
