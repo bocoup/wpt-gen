@@ -1,0 +1,89 @@
+# Invoking the WPT Evaluator as a skill-call
+
+This file documents how to drive the evaluator manually from a conversation
+with an agent. The intended use is **rubric validation** — running the
+evaluator against real WPT test files to discover where rules are unclear,
+miscalibrated, or missing — before any CLI or workflow integration is built.
+
+The expected output format and rubric come from
+[`SKILL.md`](SKILL.md). This file only describes the invocation protocol.
+
+## Scratch directory layout
+
+Place inputs and outputs in the repo-root scratch directory:
+
+```
+.wpt-evaluator-tmp/
+├── inputs/      # test files to evaluate (one per file)
+└── outputs/     # findings reports, named to match inputs
+```
+
+`.wpt-evaluator-tmp/` is gitignored. Test inputs can be copies of files from
+`../wpt/`, files produced by wpt-gen, or hand-crafted cases for probing
+specific rules.
+
+## Invocation protocol
+
+In a fresh conversation, paste a prompt of the following shape. Replace
+`<path>` with the file under evaluation.
+
+```
+Evaluate the WPT test file at <path> using the wpt-evaluator skill.
+
+1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric.
+2. Read the test file at <path>.
+3. Detect the test kind from the filename and contents (testharness,
+   reftest, manual, crashtest, visual, idl, wdspec, etc.).
+4. Load rules from wptgen/skills/wpt-evaluator/references/rules.yaml,
+   filtering to those whose `applies_to` includes the detected kind
+   (plus matching `html`/`js`/`css` etc. based on file content).
+5. Evaluate the test file against each applicable rule.
+6. Produce findings in the format specified by SKILL.md:
+   - Rule ID, severity, line reference, evidence quote, source citation.
+   - No composite score. No proposed fixes.
+7. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
+   <filename> matches the input filename with `.md` appended.
+```
+
+If the file path is relative to a directory you've cloned alongside (e.g.,
+`../wpt/css/css-flexbox/flex-direction-001.html`), pass that path as-is —
+the agent has read access to sibling directories.
+
+## What to look for during validation
+
+When reviewing the output, the rubric-design questions to keep in mind:
+
+1. **Are findings grounded?** Each finding should cite a specific line in
+   the test file and a specific rule ID. If the agent writes
+   "this test is poorly structured" without a rule ID and line, the
+   rubric prompted too loosely.
+2. **Are the `layer` labels accurate?** A rule marked `deterministic`
+   should be flagged via straightforward pattern matching, not subjective
+   judgment. If the agent had to reason heavily to apply it, the rule
+   should probably be `semantic` (or rewritten).
+3. **Are there obvious issues the evaluator missed?** Tests have
+   anti-patterns the rule set doesn't cover. Note them — they are
+   candidates for new rules.
+4. **Is the severity calibrated?** An `error` finding should reflect
+   something a maintainer would block on. A `nit` should be ignorable.
+   Mismatches indicate the severity field needs tuning.
+5. **Is the output readable?** If a human reviewer would have to wade
+   through noise to find signal, the format needs work.
+
+Record discoveries from each invocation in
+`.wpt-evaluator-tmp/outputs/<filename>.md` alongside the findings, or in
+a separate notes file. These become the input for the next rubric pass.
+
+## When to graduate beyond skill-call
+
+After running this protocol against several diverse tests (testharness,
+reftest, manual, crashtest, ideally tests of varying quality), and once
+the rubric is producing consistent useful output, the next step is a CLI
+command. The CLI is a thin wrapper around exactly this protocol:
+
+```
+wpt-gen evaluate <path-to-test-file>
+```
+
+Same skill, same rules, same output format — just automated invocation
+instead of manual prompting.

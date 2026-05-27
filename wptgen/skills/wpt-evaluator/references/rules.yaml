@@ -21,7 +21,7 @@
 # See ../UPSTREAM.md for the pinned upstream commit and refresh procedure.
 # See ../SKILL.md for how this corpus is consumed.
 
-version: 0.3.0
+version: 0.4.0
 wpt_upstream_commit: 255065af5cc7d18e891ff558024eca5623a0b6ac
 
 # Category codes (used as rule ID prefixes):
@@ -126,6 +126,20 @@ rules:
       include a `<title>` element; the test title is taken from it.
     cite: >
       In this case the test title is taken from the `title` element.
+
+  - id: FMT-007
+    source: wpt/docs/writing-tests/crashtest.md#L27-L29
+    category: file-format
+    applies_to: [crashtest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Crashtests do not need to include `testharness.js` or use any of the
+      testharness API; they do not need to declare a `test(...)`.
+    cite: >
+      Note that crash tests do not need to include `testharness.js` or use
+      any of the testharness API (e.g. they do not need to declare a
+      `test(..)`).
 
   # ─── filename ───────────────────────────────────────────────────────────
 
@@ -274,6 +288,50 @@ rules:
       have filenames of the form `name-manual.ext` (i.e., a `-manual`
       suffix after the main filename but before the extension).
 
+  - id: NAME-011
+    source: wpt/docs/writing-tests/crashtest.md#L8-L13
+    category: filename
+    applies_to: [crashtest]
+    severity: error
+    layer: deterministic
+    rule: |
+      Crashtests are identified by `-crash` in the filename immediately
+      before the extension, or by being in a directory named `crashtests`.
+      `bar-crash-001.html` is NOT a crashtest.
+    cite: >
+      Crashtests are identified by the string `-crash` in the filename
+      immediately before the extension, or by being in a directory called
+      `crashtests`. ... `css/css-foo/bar-crash-001.html` is not a crash
+      test.
+
+  - id: NAME-012
+    source: wpt/docs/writing-tests/print-reftests.md#L7-L13
+    category: filename
+    applies_to: [reftest, print-reftest]
+    severity: error
+    layer: deterministic
+    rule: |
+      Print reftests are identified by `-print` in the filename immediately
+      before the extension, or by being under a directory named `print`.
+      `bar-print-001.html` is NOT a print reftest.
+    cite: >
+      Print reftests are distinguished by the string `-print` in the
+      filename immediately before the extension, or by being under a
+      directory named `print`. ... `css/css-foo/bar-print-001.html` is not
+      a print reftest.
+
+  - id: NAME-013
+    source: wpt/docs/writing-tests/visual.md#L13-L15
+    category: filename
+    applies_to: [visual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Visual tests must have `-visual` immediately before the extension.
+    cite: >
+      Visuals tests are test files which have `-visual` at the end of their
+      filename, before the extension.
+
   # ─── metadata ───────────────────────────────────────────────────────────
 
   - id: META-001
@@ -328,6 +386,86 @@ rules:
     cite: >
       A test file can have multiple variants by including `meta` elements
       [example shows `<meta name="variant" content="?default">`].
+
+  - id: META-005
+    source: wpt/docs/writing-tests/css-metadata.md#L5-L12
+    category: metadata
+    applies_to: [css]
+    severity: error
+    layer: deterministic
+    rule: |
+      CSS tests REQUIRE at least one `<link rel="help" href="...">`
+      pointing to the relevant specification section.
+    cite: >
+      Each test requires at least one link to specifications:
+      `<link rel="help" href="RELEVANT_SPEC_SECTION" />`
+
+  - id: META-006
+    source: wpt/docs/writing-tests/css-metadata.md#L16-L25
+    category: metadata
+    applies_to: [css]
+    severity: warn
+    layer: semantic
+    rule: |
+      Specification links should target relevant sections (using the spec's
+      Table of Contents anchors). When multiple links are present, list the
+      primary section being tested first, ordered from most/specific to
+      least/specific.
+    cite: >
+      Links should link to relevant sections within the specification ...
+      Always list the primary section that is being tested as the first
+      item in the list of specification links. Order the list from the
+      most used/specific to least used/specific.
+
+  - id: META-007
+    source: wpt/docs/writing-tests/css-metadata.md#L156-L168
+    category: metadata
+    applies_to: [css, testharness, reftest, html]
+    severity: warn
+    layer: semantic
+    rule: |
+      `<meta name="assert">` content must NOT be: a copy of the title,
+      a copy of test verification instructions, a duplicate of another
+      assertion in the suite, or a line from the spec (unless that line
+      is a complete assertion out of context).
+    cite: >
+      The assertion should not be: A copy of the title text. A copy of
+      the test verification instructions. A duplicate of another
+      assertion in the test suite. A line or reference from the CSS
+      specification unless that line is a complete assertion when taken
+      out of context.
+
+  - id: META-008
+    source: wpt/docs/writing-tests/css-metadata.md#L95-L135
+    category: metadata
+    applies_to: [css]
+    severity: warn
+    layer: deterministic
+    rule: |
+      The following `<meta name="flags">` tokens are DEPRECATED for new
+      CSS tests: `animated`, `font`, `history`, `interact`, `speech`,
+      `userstyle`. Tests that satisfy these criteria should use the
+      `-manual` filename flag instead.
+    cite: >
+      The following flags are deprecated and should not be declared by
+      new tests. Tests which satisfy the described criteria should
+      simply be designated as "manual" using [the `-manual` file name
+      flag].
+
+  - id: META-009
+    source: wpt/docs/writing-tests/print-reftests.md#L29-L47
+    category: metadata
+    applies_to: [reftest, print-reftest]
+    severity: info
+    layer: deterministic
+    rule: |
+      Print reftests may limit comparison to a subset of pages with
+      `<meta name="reftest-pages" content="<range-specifier>">` (e.g.,
+      `"-2,4,6,7,9-"`).
+    cite: >
+      In some cases it may be desirable to only compare a subset of the
+      output pages in the reftest. This is possible using `<meta
+      name=reftest-pages content=[range-specifier]>`.
 
   # ─── assertions ─────────────────────────────────────────────────────────
 
@@ -557,6 +695,111 @@ rules:
       otherwise determine the outcome. Any information other than this
       (e.g., quotes from the spec) should be avoided.
 
+  - id: STRUCT-011
+    source: wpt/docs/writing-tests/crashtest.md#L19-L25
+    category: structure
+    applies_to: [crashtest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Crashtests that perform work after initial page load must use
+      `class="test-wait"` on the root element (NOT `reftest-wait`). The
+      test completes when the attribute is removed.
+    cite: >
+      In this case the test may specify a `class=test-wait` attribute on
+      the root element. The test will not complete until that attribute is
+      removed from the root.
+
+  - id: STRUCT-012
+    source: wpt/docs/writing-tests/print-reftests.md#L15-L22
+    category: structure
+    applies_to: [reftest, print-reftest]
+    severity: info
+    layer: deterministic
+    rule: |
+      Print reftests specify the reference via `<link rel=match>` like
+      ordinary reftests. The default page box is 12.7 cm by 7.62 cm
+      (5x3 inches) with 12.7 mm (0.5 inch) margins on all sides.
+    cite: >
+      Like ordinary reftests, the reference is specified using a `<link
+      rel=match>` element. The default page size ... is 12.7 cm by 7.62
+      cm (5 inches by 3 inches) with a default margin of 12.7 mm (0.5
+      inches) on all sides.
+
+  - id: STRUCT-013
+    source: wpt/docs/writing-tests/rendering.md#L8-L24
+    category: structure
+    applies_to: [reftest, visual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Rendering tests should indicate success with a recognizable visual
+      pattern — typically a green paragraph ("This text should be
+      green") or a green square. The green square is often layered over
+      a red square so misalignment exposes red.
+    cite: >
+      Success is largely indicated by the color green ... The green
+      paragraph ... The green square: applicable to many block layout
+      tests, the test renders a green square when it passes ... This
+      green square is often rendered over a red square, such that when
+      the test fails there is red visible on the page.
+
+  - id: STRUCT-014
+    source: wpt/docs/writing-tests/rendering.md#L37-L59
+    category: structure
+    applies_to: [reftest, visual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Rendering tests should be designed so that failures are visually
+      obvious. Use red to expose alignment/painting failures, design
+      `line-height`/`font-size` tests so failures cause text overlap,
+      or use properties like `quotes`/`content` to render the literal
+      text "FAIL" on failure.
+    cite: >
+      Using the color red is probably the best way of highlighting
+      failures. ... Tests of the `line-height`, `font-size` and similar
+      properties can sometimes be devised in such a way that a failure
+      will result in the text overlapping. ... Some properties lend
+      themselves well to making "FAIL" render in the case of something
+      going wrong.
+
+  - id: STRUCT-015
+    source: wpt/docs/writing-tests/rendering.md#L26-L35
+    category: structure
+    applies_to: [reftest, visual]
+    severity: warn
+    layer: semantic
+    rule: |
+      When the entire canvas is rendered green, take care that the test
+      does not result in a passing-looking single green paragraph if it
+      fails. Typically the short descriptive paragraph is forced to a
+      neutral color (e.g., white).
+    cite: >
+      More occasionally, the entire canvas is rendered green ... Care
+      has to be taken when writing tests like this that the test will
+      not result in a single green paragraph if it fails. This is
+      usually done by forcing the short descriptive paragraph to have a
+      neutral color (e.g., white).
+
+  - id: STRUCT-016
+    source: wpt/docs/writing-tests/visual.md#L17-L27
+    category: structure
+    applies_to: [visual]
+    severity: warn
+    layer: semantic
+    rule: |
+      Visual tests must follow the general test guidelines and the
+      rendering test guidelines (especially color conventions), and must
+      be self-describing — they must give a clear pass condition in
+      their rendering.
+    cite: >
+      They should follow the general test guidelines, especially noting
+      the requirement to be self-describing (i.e., they must give a
+      clear pass condition in their rendering). Similarly, they should
+      consider the rendering test guidelines, especially those about
+      color.
+
   # ─── api-usage ──────────────────────────────────────────────────────────
 
   - id: API-001
@@ -634,6 +877,82 @@ rules:
     cite: >
       In this case one must pass `{explicit_timeout: true}` in a call to
       `setup()` in order to disable the automatic timeout of the test.
+
+  - id: API-006
+    source: wpt/docs/writing-tests/testdriver.md#L23-L32
+    category: api-usage
+    applies_to: [testharness, reftest, crashtest]
+    severity: error
+    layer: deterministic
+    rule: |
+      Documents that use testdriver must include BOTH
+      `/resources/testdriver.js` and `/resources/testdriver-vendor.js`.
+    cite: >
+      The `testdriver.js` and `testdriver-vendor.js` must both be included
+      in any document that uses testdriver (and in the top-level test
+      document when using testdriver from a different context).
+
+  - id: API-007
+    source: wpt/docs/writing-tests/testdriver.md#L16-L22
+    category: api-usage
+    applies_to: [reftest, crashtest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      For testdriver-driven reftests and print-reftests, use
+      `class=reftest-wait` on the root element. For crashtests, use
+      `class=test-wait`.
+    cite: >
+      testdriver.js supports the following test types: ... reftests and
+      print-reftests that use the `class=reftest-wait` attribute on the
+      root element to control completion. crashtests that use the
+      `class=test-wait` attribute to control completion.
+
+  - id: API-008
+    source: wpt/docs/writing-tests/testdriver.md#L34-L49
+    category: api-usage
+    applies_to: [testharness, reftest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      To use WebDriver BiDi, enable the `bidi` feature by including
+      `/resources/testdriver.js?feature=bidi` (or
+      `// META: script=/resources/testdriver.js?feature=bidi` for JS-only
+      tests).
+    cite: >
+      To use WebDriver BiDi, enable the `bidi` feature in `testdriver.js`
+      by adding the `feature=bidi` query string parameter.
+
+  - id: API-009
+    source: wpt/docs/writing-tests/testdriver.md#L253-L260
+    category: api-usage
+    applies_to: [testharness, reftest]
+    severity: warn
+    layer: deterministic
+    rule: |
+      To use the testdriver Actions API, include
+      `/resources/testdriver-actions.js` in addition to `testdriver.js`.
+    cite: >
+      To use the Actions API `testdriver-actions.js` must be included in
+      the document, in addition to `testdriver.js`.
+
+  - id: API-010
+    source: wpt/docs/writing-tests/wdspec.md#L19-L34
+    category: api-usage
+    applies_to: [wdspec]
+    severity: warn
+    layer: semantic
+    rule: |
+      In wdspec tests, use the `webdriver` client library's convenience
+      methods for set-up code, but issue the command under test by
+      sending the HTTP request directly. This avoids indirection that
+      obfuscates failures.
+    cite: >
+      The convenience methods in the `webdriver` library should be used
+      to perform this task because they reduce duplication. However, the
+      same methods should not be used to issue the command under test.
+      Instead, the HTTP request describing the command should be sent
+      directly.
 
   # ─── portability ────────────────────────────────────────────────────────
 
@@ -713,6 +1032,57 @@ rules:
       The `medium` `font-size` computes to 16px. The canvas background is
       `white`. The initial value of `color` is `black`. The user
       stylesheet is empty (except where indicated by the tests).
+
+  - id: PORT-006
+    source: wpt/docs/writing-tests/server-features.md#L40-L48
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: error
+    layer: deterministic
+    rule: |
+      Tests must NOT hardcode the hostname of the server or the port
+      numbers. Use the `location` API in script, or wptserve's textual
+      substitution feature (`.sub` filename or `?pipe=sub` query) with
+      `{{host}}`, `{{hosts[...]}}`, `{{ports[...]}}`, `{{location[...]}}`.
+    cite: >
+      Tests must not hardcode the hostname of the server that they expect
+      to be running on or the port numbers, as these are not guaranteed
+      by the test environment.
+
+  - id: PORT-007
+    source: wpt/docs/writing-tests/server-features.md#L31-L39
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: warn
+    layer: deterministic
+    rule: |
+      Cross-origin tests must use the documented set of subdomains
+      (`www`, `www1`, `www2`, `天気の良い日`, `élève`, plus `nonexistent`
+      which is guaranteed not to resolve), and the documented HTTP/WS
+      ports. Two domains are available: the main (unnamed) and `alt`.
+    cite: >
+      Our test servers are guaranteed to be accessible through two
+      domains and five subdomains under each. ... These subdomains and
+      ports must be used for cross-origin tests.
+
+  - id: PORT-008
+    source: wpt/docs/writing-tests/server-features.md#L77-L94
+    category: portability
+    applies_to: [html, js, testharness, reftest, manual]
+    severity: info
+    layer: deterministic
+    rule: |
+      Custom HTTP headers for a test are set via a sibling file with the
+      same path plus a `.headers` suffix (e.g.,
+      `test.html.headers`). To apply headers to a whole directory use
+      `__dir__.headers`, which applies only to the immediate directory.
+    cite: >
+      For tests requiring that a certain HTTP header is set to some
+      static value, a file with the same path as the test file except
+      for an additional `.headers` suffix may be created. ... To apply
+      the same headers to all files in a directory use a
+      `__dir__.headers` file. This will only apply to the immediate
+      directory and not subdirectories.
 
   # ─── focus ──────────────────────────────────────────────────────────────
 

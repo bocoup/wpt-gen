@@ -32,9 +32,17 @@ Rules currently draw from:
 - `wpt/docs/writing-tests/testharness.md`
 - `wpt/docs/writing-tests/file-names.md`
 - `wpt/docs/writing-tests/reftests.md`
+- `wpt/docs/writing-tests/print-reftests.md`
 - `wpt/docs/writing-tests/idlharness.md`
 - `wpt/docs/writing-tests/manual.md`
+- `wpt/docs/writing-tests/crashtest.md`
+- `wpt/docs/writing-tests/visual.md`
+- `wpt/docs/writing-tests/wdspec.md`
+- `wpt/docs/writing-tests/testdriver.md`
 - `wpt/docs/writing-tests/assumptions.md`
+- `wpt/docs/writing-tests/rendering.md`
+- `wpt/docs/writing-tests/server-features.md`
+- `wpt/docs/writing-tests/css-metadata.md`
 - `wpt/docs/reviewing-tests/checklist.md`
 
 ## Refresh procedure
