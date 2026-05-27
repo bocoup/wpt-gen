@@ -2,10 +2,16 @@
 
 This file documents how to drive the evaluator manually from a conversation
 with an agent. The intended use is **rubric validation** — running the
-evaluator against real WPT test files to discover where rules are unclear,
-miscalibrated, or missing — before any CLI or workflow integration is built.
+evaluator against real WPT test files to discover where the upstream
+guidance is unclear, ambiguous, or missing — before any CLI or workflow
+integration is built.
 
-The expected output format and rubric come from
+This branch (`wpt-eval-doc-inputs`) is the **doc-inputs variant**: the
+evaluator reads upstream WPT documentation directly, rather than a
+distilled `rules.yaml`. Findings cite the source doc + line range that
+prompted the flag.
+
+The expected output format and reading lists come from
 [`SKILL.md`](SKILL.md). This file only describes the invocation protocol.
 
 ## Scratch directory layout
@@ -20,7 +26,7 @@ Place inputs and outputs in the repo-root scratch directory:
 
 `.wpt-evaluator-tmp/` is gitignored. Test inputs can be copies of files from
 `../wpt/`, files produced by wpt-gen, or hand-crafted cases for probing
-specific rules.
+specific guidance.
 
 ## Invocation protocol
 
@@ -28,19 +34,24 @@ In a fresh conversation, paste a prompt of the following shape. Replace
 `<path>` with the file under evaluation.
 
 ```
-Evaluate the WPT test file at <path> using the wpt-evaluator skill.
+Evaluate the WPT test file at <path> using the wpt-evaluator skill
+(doc-inputs variant).
 
-1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric.
+1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric and the
+   curated reading lists by test kind.
 2. Read the test file at <path>.
 3. Detect the test kind from the filename and contents (testharness,
-   reftest, manual, crashtest, visual, idl, wdspec, etc.).
-4. Load rules from wptgen/skills/wpt-evaluator/references/rules.yaml,
-   filtering to those whose `applies_to` includes the detected kind
-   (plus matching `html`/`js`/`css` etc. based on file content).
-5. Evaluate the test file against each applicable rule.
+   reftest, print-reftest, crashtest, manual, visual, idl, wdspec, css).
+4. Load every doc on the curated reading list for that test kind
+   (including the baseline "all kinds" list).
+5. Identify normative statements in the loaded docs and evaluate the
+   test file against each one. Skip statements already enforced by
+   `wpt lint`.
 6. Produce findings in the format specified by SKILL.md:
-   - Rule ID, severity, line reference, evidence quote, source citation.
-   - No composite score. No proposed fixes.
+   - Severity, line reference in the test file, evidence quote,
+     source citation (upstream doc path + line range), one-sentence
+     summary of the guidance.
+   - No composite score. No proposed fixes. No synthetic rule IDs.
 7. As you work, track every file you read in service of the evaluation.
    For each file: its path and its byte size (use `wc -c <path>` or
    equivalent). Do NOT count files you only touched to navigate (e.g.,
@@ -58,8 +69,7 @@ the agent has read access to sibling directories.
 
 The findings report must begin with an Input scope section recording what
 was loaded into context during the evaluation. This makes it possible to
-compare the corpus weight of different evaluator designs (e.g., distilled
-YAML vs. tagged upstream docs).
+compare the corpus weight of different evaluator designs.
 
 Use this template, replacing the example numbers with actual `wc -c`
 output. Sum the bytes column at the bottom.
@@ -67,18 +77,20 @@ output. Sum the bytes column at the bottom.
 ```markdown
 ## Input scope
 
-| File                                              |    Bytes |
-| ------------------------------------------------- | -------: |
-| wptgen/skills/wpt-evaluator/SKILL.md              |    4,002 |
-| wptgen/skills/wpt-evaluator/references/rules.yaml |   26,341 |
-| <path to test file under evaluation>              |    3,128 |
-| **Total**                                         | **33,471** |
+| File                                                  |    Bytes |
+| ----------------------------------------------------- | -------: |
+| wptgen/skills/wpt-evaluator/SKILL.md                  |    5,234 |
+| wpt/docs/writing-tests/general-guidelines.md          |   10,841 |
+| wpt/docs/writing-tests/file-names.md                  |    3,012 |
+| ...                                                   |      ... |
+| <path to test file under evaluation>                  |    3,128 |
+| **Total**                                             | **NN,NNN** |
 
-Approach: distilled-yaml          # or tagged-docs, prose-direct, etc.
-Approximate input tokens: ~8,400  # bytes ÷ 4
+Approach: doc-inputs              # use one of: distilled-yaml, doc-inputs
+Approximate input tokens: ~NN,NNN # bytes ÷ 4
 ```
 
-The "Approach" tag lets later A/B comparisons group reports by evaluator
+The "Approach" tag lets A/B comparisons group reports by evaluator
 design. Use a short stable label per approach.
 
 After the Input scope section, continue with the findings as specified
@@ -102,19 +114,20 @@ For the conversation-wide actual token count, use Claude Code's
 When reviewing the output, the rubric-design questions to keep in mind:
 
 1. **Are findings grounded?** Each finding should cite a specific line in
-   the test file and a specific rule ID. If the agent writes
-   "this test is poorly structured" without a rule ID and line, the
-   rubric prompted too loosely.
-2. **Are the `layer` labels accurate?** A rule marked `deterministic`
-   should be flagged via straightforward pattern matching, not subjective
-   judgment. If the agent had to reason heavily to apply it, the rule
-   should probably be `semantic` (or rewritten).
+   the test file and a specific upstream doc location. If the agent writes
+   "this test is poorly structured" without a doc citation and a test line,
+   the rubric prompted too loosely.
+2. **Are findings accurate?** Does the doc citation actually back the
+   finding, or did the evaluator over-interpret the prose? With the
+   doc-inputs approach, this risk is higher than with the YAML approach
+   because the source is less constrained.
 3. **Are there obvious issues the evaluator missed?** Tests have
-   anti-patterns the rule set doesn't cover. Note them — they are
-   candidates for new rules.
+   anti-patterns the upstream docs don't cover. Note them — they are
+   candidates for future work (either upstreaming guidance, or
+   reintroducing a thin wpt-gen-side rules layer).
 4. **Is the severity calibrated?** An `error` finding should reflect
    something a maintainer would block on. A `nit` should be ignorable.
-   Mismatches indicate the severity field needs tuning.
+   Verify that the inferred severity matches the upstream RFC 2119 keyword.
 5. **Is the output readable?** If a human reviewer would have to wade
    through noise to find signal, the format needs work.
 
@@ -124,14 +137,14 @@ a separate notes file. These become the input for the next rubric pass.
 
 ## When to graduate beyond skill-call
 
-After running this protocol against several diverse tests (testharness,
-reftest, manual, crashtest, ideally tests of varying quality), and once
-the rubric is producing consistent useful output, the next step is a CLI
-command. The CLI is a thin wrapper around exactly this protocol:
+After running this protocol against several diverse tests, and once one
+of the evaluator designs is producing consistent useful output, the next
+step is a CLI command. The CLI is a thin wrapper around exactly this
+protocol:
 
 ```
 wpt-gen evaluate <path-to-test-file>
 ```
 
-Same skill, same rules, same output format — just automated invocation
-instead of manual prompting.
+Same skill, same docs (or rules), same output format — just automated
+invocation instead of manual prompting.
