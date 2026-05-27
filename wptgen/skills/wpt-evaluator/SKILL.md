@@ -32,8 +32,28 @@ For each applicable rule, a finding:
 - A short evidence quote.
 - A citation back to the rule's source in upstream WPT documentation.
 
-The evaluator does **not** produce a composite score and does **not** propose
-fixes.
+### Prohibited outputs
+
+The following are **hard prohibitions**, not preferences:
+
+1. **No composite score.** Do not aggregate findings into a single
+   number, grade, or pass/fail verdict. Report each finding on its
+   own.
+2. **No proposed fixes.** Findings describe **what** is wrong and
+   **why**, never **how to fix it**. The following all count as
+   proposed fixes and must not appear in a report:
+   - "Should use X instead." / "The test should..."
+   - "Suggested title:" / "Suggested replacement:" / "Suggested
+     rewrite:"
+   - "Could be improved by..." / "Consider..."
+   - Concrete code rewrites or before/after snippets.
+   - A code block that is not present in the test file as written.
+   Evidence quotes (verbatim from the test) are not fixes and are
+   allowed.
+
+If you find yourself writing "should be X" or attaching a code
+suggestion, stop. State the problem and cite the rule; the human
+reviewer decides the remediation.
 
 ## Procedure
 
@@ -46,7 +66,10 @@ fixes.
    anything already covered by `wpt lint` to avoid double-flagging.
 4. **Follow declared dependencies as needed** (see below) when reading
    them would inform a specific finding.
-5. **Emit findings** in the format above.
+5. **Emit findings** in the format above. Before writing each
+   finding, verify it does not violate the prohibited outputs:
+   no composite score, no proposed fix. Findings describe **what**
+   is wrong and **why**, never **how to fix it**.
 
 ## Dependency reading (as-needed)
 
