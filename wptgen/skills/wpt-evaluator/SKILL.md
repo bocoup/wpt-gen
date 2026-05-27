@@ -163,3 +163,22 @@ The full rules corpus is small enough to load once. For larger eventual
 corpora, the `applies_to` and `category` fields support lazy loading (e.g.,
 load only rules with `reftest` in `applies_to` when evaluating a reftest
 file).
+
+## Tracking input scope
+
+While running the evaluation, record every file opened with its byte
+size (`wc -c <path>`). Include the test file under evaluation. Do NOT
+count files only used for navigation (directory listings, this skill
+itself, etc.). The findings report begins with an Input scope section
+that must include, at minimum:
+
+1. A bytes table with one row per file read, ending in a **Total** row.
+2. A "Declared dependencies (not read)" line listing framework and
+   external dependencies that were detected but not opened.
+3. An `Approach:` tag (e.g., `distilled-yaml`, `doc-inputs`).
+4. An `Approximate input tokens:` line computed as `Total bytes ÷ 4`.
+
+The token estimate exists to make corpus weight comparable across
+evaluator designs. It is a lower bound (system prompt, tool-call
+overhead, and reasoning tokens are not counted), but a directly
+comparable lower bound between approaches.
