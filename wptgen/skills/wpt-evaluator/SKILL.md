@@ -64,8 +64,79 @@ Do **not** produce a composite score. Do **not** propose fixes. Do
 4. **Evaluate the test file** against each statement. Skip rules
    already enforced by `wpt lint` (no tabs, no trailing whitespace,
    no `setTimeout`, `assert_throws`/`promise_rejects` deprecation,
-   etc.) to avoid double-flagging.
-5. **Emit findings** in the format above.
+   filename duplicate / case-collision rules, etc.) to avoid
+   double-flagging.
+5. **Follow declared dependencies as needed** (see below) when reading
+   them would inform a specific finding.
+6. **Emit findings** in the format above.
+
+## Dependency reading (as-needed)
+
+The test file may declare dependencies on other local files. List every
+declared dependency you detect, but only **read** a dependency when
+doing so is necessary to evaluate a specific piece of upstream
+guidance. The goal is to keep the corpus small unless the contents of
+a dependency actually matter for a finding.
+
+### What counts as a declared dependency
+
+Detect these forms in the test file's source:
+
+- `<script src="...">` — JS includes.
+- `<link rel="match" href="...">` and `<link rel="mismatch" href="...">`
+  — reftest reference files.
+- `<link rel="stylesheet" href="...">` — CSS includes.
+- `<link rel="help" href="...">` — spec URL (external; do not read).
+- `<img src="...">`, `<iframe src="...">`, `<source src="...">`,
+  `<video src="...">`, `<audio src="...">` — embedded resources.
+- `// META: script=...` — JS dependency (testharness JS-only tests).
+- `importScripts("...")` — worker script imports.
+- `fetch("...")` and similar runtime fetches to local paths.
+
+For each dependency, note the path it points to. Classify it as:
+
+- **Framework** if it begins with `/resources/`, `/common/`, `/fonts/`,
+  or `/media/`. These are WPT-provided and should be **listed but not
+  read**.
+- **External** if it's an absolute URL (`http(s)://`) or starts with
+  `//`. **List only**; do not fetch.
+- **Local** otherwise. May be **read on demand** per the criteria
+  below.
+
+### When to read a local dependency
+
+Read a local dependency only if at least one of these applies:
+
+- **Reftest reference verification**: the test is a reftest and the
+  upstream reftest guidance ("the reference file should use a
+  different technique that won't fail in the same way as the test"
+  and "the reference file ... does not use the technology under
+  test") cannot be evaluated without comparing the two files. Read
+  the reference file.
+- **Reference existence**: a `<link rel="match">` or `<link
+  rel="mismatch">` points at a path. Verify the file exists
+  (directory listing is sufficient; reading is not required unless
+  the previous bullet applies).
+- **META script existence**: a `// META: script=...` points at a
+  local path (not under `/resources/` or `/common/`). Verify the
+  file exists.
+- **Specific upstream guidance requires it**: a particular normative
+  statement in a loaded doc can only be evaluated by inspecting the
+  dependency's contents. State which statement, and why the
+  dependency's contents are needed, when emitting the finding.
+
+Do **not** read a local dependency:
+
+- To explore the broader test ecosystem.
+- To look for similar tests or patterns.
+- To check for duplicates (lint already covers basename and
+  case-collision duplication).
+- Because it "might be relevant" without a specific upstream statement
+  that requires it.
+
+All dependencies you read must appear in the Input scope section with
+their byte sizes, alongside the test file and the curated reading
+list.
 
 ## Curated reading lists by test kind
 

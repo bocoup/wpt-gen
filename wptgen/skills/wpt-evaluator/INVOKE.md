@@ -37,26 +37,30 @@ In a fresh conversation, paste a prompt of the following shape. Replace
 Evaluate the WPT test file at <path> using the wpt-evaluator skill
 (doc-inputs variant).
 
-1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric and the
-   curated reading lists by test kind.
+1. Read wptgen/skills/wpt-evaluator/SKILL.md to load the rubric, the
+   curated reading lists, and the dependency-reading rules.
 2. Read the test file at <path>.
 3. Detect the test kind from the filename and contents (testharness,
    reftest, print-reftest, crashtest, manual, visual, idl, wdspec, css).
 4. Load every doc on the curated reading list for that test kind
    (including the baseline "all kinds" list).
-5. Identify normative statements in the loaded docs and evaluate the
+5. Detect declared dependencies in the test file (script src, link
+   href, // META: script, etc.). List them, classify each as
+   framework/external/local, and read local dependencies ONLY when
+   SKILL.md's "When to read a local dependency" criteria apply.
+6. Identify normative statements in the loaded docs and evaluate the
    test file against each one. Skip statements already enforced by
    `wpt lint`.
-6. Produce findings in the format specified by SKILL.md:
+7. Produce findings in the format specified by SKILL.md:
    - Severity, line reference in the test file, evidence quote,
      source citation (upstream doc path + line range), one-sentence
      summary of the guidance.
    - No composite score. No proposed fixes. No synthetic rule IDs.
-7. As you work, track every file you read in service of the evaluation.
+8. As you work, track every file you read in service of the evaluation.
    For each file: its path and its byte size (use `wc -c <path>` or
    equivalent). Do NOT count files you only touched to navigate (e.g.,
    directory listings, this INVOKE.md, files referenced but not opened).
-8. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
+9. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
    <filename> matches the input filename with `.md` appended. Prepend
    an "Input scope" section to the report (format below).
 ```
@@ -77,18 +81,27 @@ output. Sum the bytes column at the bottom.
 ```markdown
 ## Input scope
 
-| File                                                  |    Bytes |
-| ----------------------------------------------------- | -------: |
-| wptgen/skills/wpt-evaluator/SKILL.md                  |    5,234 |
-| wpt/docs/writing-tests/general-guidelines.md          |   10,841 |
-| wpt/docs/writing-tests/file-names.md                  |    3,012 |
-| ...                                                   |      ... |
-| <path to test file under evaluation>                  |    3,128 |
-| **Total**                                             | **NN,NNN** |
+| File                                                  |    Bytes | Role         |
+| ----------------------------------------------------- | -------: | ------------ |
+| wptgen/skills/wpt-evaluator/SKILL.md                  |    5,234 | skill        |
+| wpt/docs/writing-tests/general-guidelines.md          |   10,841 | reading-list |
+| wpt/docs/writing-tests/file-names.md                  |    3,012 | reading-list |
+| ...                                                   |      ... |              |
+| <path to test file under evaluation>                  |    3,128 | test         |
+| <path to dependency that was read>                    |      812 | dependency   |
+| **Total**                                             | **NN,NNN** |              |
 
+Declared dependencies (not read): /resources/testharness.js,
+/resources/testharnessreport.js, https://example.org/foo.js
 Approach: doc-inputs              # use one of: distilled-yaml, doc-inputs
 Approximate input tokens: ~NN,NNN # bytes ÷ 4
 ```
+
+The `Role` column distinguishes the skill, curated reading-list docs,
+the test file, and any dependencies that were actually read. List
+dependencies that were detected but NOT read (framework + external)
+on the line below the table so the cost of "considered but skipped"
+is also visible.
 
 The "Approach" tag lets A/B comparisons group reports by evaluator
 design. Use a short stable label per approach.
