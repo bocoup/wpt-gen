@@ -47,8 +47,30 @@ For each finding:
   `wpt/docs/writing-tests/general-guidelines.md:L82-L87`).
 - **One-sentence summary** of what the guidance says, paraphrased.
 
-Do **not** produce a composite score. Do **not** propose fixes. Do
-**not** invent a rule ID; the source citation is the identifier.
+### Prohibited outputs
+
+The following are **hard prohibitions**, not preferences:
+
+1. **No composite score.** Do not aggregate findings into a single
+   number, grade, or pass/fail verdict. Report each finding on its
+   own.
+2. **No proposed fixes.** Findings describe **what** is wrong and
+   **why**, never **how to fix it**. The following all count as
+   proposed fixes and must not appear in a report:
+   - "Should use X instead." / "The test should..."
+   - "Suggested title:" / "Suggested replacement:" / "Suggested
+     rewrite:"
+   - "Could be improved by..." / "Consider..."
+   - Concrete code rewrites or before/after snippets.
+   - A code block that is not present in the test file as written.
+   Evidence quotes (verbatim from the test) are not fixes and are
+   allowed.
+3. **No invented rule IDs.** The source citation (upstream doc path
+   + line range) is the identifier.
+
+If you find yourself writing "should be X" or attaching a code
+suggestion, stop. State the problem and cite the source; the human
+reviewer decides the remediation.
 
 ## Procedure
 
@@ -68,7 +90,11 @@ Do **not** produce a composite score. Do **not** propose fixes. Do
    double-flagging.
 5. **Follow declared dependencies as needed** (see below) when reading
    them would inform a specific finding.
-6. **Emit findings** in the format above.
+6. **Emit findings** in the format above. Before writing each
+   finding, verify it does not violate the prohibited outputs:
+   no composite score, no proposed fix, no invented rule ID.
+   Findings describe **what** is wrong and **why**, never **how to
+   fix it**.
 
 ## Dependency reading (as-needed)
 
