@@ -62,7 +62,15 @@ Evaluate the WPT test file at <path> using the wpt-evaluator skill
    directory listings, this INVOKE.md, files referenced but not opened).
 9. Write the findings to .wpt-evaluator-tmp/outputs/<filename>.md, where
    <filename> matches the input filename with `.md` appended. Prepend
-   an "Input scope" section to the report (format below).
+   an "Input scope" section to the report (format below). The Input
+   scope section is REQUIRED to include all of:
+   - A bytes table with one row per file read, ending in a **Total**
+     row that sums the column.
+   - A "Declared dependencies (not read)" line listing framework and
+     external deps that were detected but not opened.
+   - An `Approach:` tag (e.g., `doc-inputs`).
+   - An `Approximate input tokens:` line computed as `Total bytes ÷ 4`.
+   Reports missing any of these fields are incomplete.
 ```
 
 If the file path is relative to a directory you've cloned alongside (e.g.,
