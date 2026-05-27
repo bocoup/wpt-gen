@@ -197,12 +197,34 @@ While running the evaluation, record every file opened with its byte
 size (`wc -c <path>`). Include the test file under evaluation. Do NOT
 count files only used for navigation (directory listings, this skill
 itself, etc.). The findings report begins with an Input scope section
-that must include, at minimum:
+in the format below:
 
-1. A bytes table with one row per file read, ending in a **Total** row.
+```markdown
+## Input scope
+
+| File                                          |    Bytes | Role         |
+| --------------------------------------------- | -------: | ------------ |
+| wptgen/skills/wpt-evaluator/SKILL.md          |    7,500 | skill        |
+| wpt/docs/writing-tests/general-guidelines.md  |    9,253 | reading-list |
+| wpt/docs/writing-tests/reftests.md            |    7,639 | reading-list |
+| <path to test file under evaluation>          |      968 | test         |
+| <path to dependency that was read>            |      580 | dependency   |
+| **Total**                                     | **NN,NNN** |              |
+
+Declared dependencies (not read): /resources/testharness.js, https://example.org/foo.js
+Approach: doc-inputs
+Approximate input tokens: ~NN,NNN
+```
+
+Required fields:
+
+1. The bytes table, ending in a **Total** row that sums the column.
+   The `Role` column distinguishes the skill, curated reading-list
+   docs, the test file, and any dependencies actually read.
 2. A "Declared dependencies (not read)" line listing framework and
-   external dependencies that were detected but not opened.
-3. An `Approach:` tag (e.g., `doc-inputs`, `distilled-yaml`).
+   external dependencies detected but not opened. Use `none` if there
+   are no such dependencies.
+3. An `Approach:` tag (`doc-inputs` for this variant).
 4. An `Approximate input tokens:` line computed as `Total bytes ÷ 4`.
 
 The token estimate exists to make corpus weight comparable across
