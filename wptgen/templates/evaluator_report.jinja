@@ -23,6 +23,37 @@ No findings raised.
 
 ---
 
+## Spec conformance
+
+{% if conformance -%}
+- **Spec**: {{ conformance.spec_url }}
+- **Requirements XML**: {{ "{:,}".format(conformance.requirements_xml_bytes) }} bytes ({% if conformance.cache_hit %}cache hit{% else %}freshly extracted{% endif %})
+
+{% if conformance.findings -%}
+{% for f in conformance.findings -%}
+### Conformance finding {{ loop.index }} — {{ f.title }}
+
+- **Severity**: {{ f.severity }}
+- **Test line**: {{ f.test_line }}
+- **Evidence**:
+  ```
+  {{ f.evidence | indent(2, first=False) }}
+  ```
+- **Source**: `{{ f.source }}`
+- **Summary**: {{ f.summary }}
+
+{% endfor -%}
+{% else -%}
+No conformance findings raised.
+
+{% endif %}
+{%- else -%}
+Conformance check: skipped (no spec provided).
+
+{% endif %}
+
+---
+
 ## Input scope
 
 | File | Bytes | Role |

@@ -882,6 +882,18 @@ def evaluate(
             resolve_path=True,
         ),
     ] = None,
+    spec_url: Annotated[
+        str | None,
+        typer.Option(
+            "--spec",
+            "-s",
+            help=(
+                "URL of the governing specification. When provided, a "
+                "conformance pass extracts normative requirements from "
+                "the spec and judges the test's assertions against them."
+            ),
+        ),
+    ] = None,
     config_path: Annotated[
         str,
         typer.Option(
@@ -914,6 +926,7 @@ def evaluate(
                 config=config,
                 jinja_env=engine.jinja_env,
                 ui=engine.ui,
+                spec_url=spec_url,
             )
         )
 

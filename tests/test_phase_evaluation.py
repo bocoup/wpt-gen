@@ -9,6 +9,7 @@ import pytest
 
 from wptgen.config import Config
 from wptgen.phases.evaluation import (
+    ConformanceSection,
     EvaluationReportRenderer,
     Finding,
     InputScope,
@@ -412,3 +413,383 @@ async def test_run_evaluation_returns_none_when_agent_returns_none(
     assert report_path is None
     # The output directory should not have been populated with a report.
     assert not output_dir.exists() or not any(output_dir.iterdir())
+
+
+# ---------------------------------------------------------------------------
+# Spec conformance rendering
+# ---------------------------------------------------------------------------
+
+
+def _conformance_finding() -> Finding:
+    return Finding(
+        title="assertion contradicts requirement",
+        severity="error",
+        test_line="Line 42",
+        evidence="assert_equals(getComputedStyle(el).flexBasis, '0px')",
+        source="requirements.xml#R3",
+        summary="Spec says flex-basis defaults to 'auto', not '0px'.",
+    )
+
+
+def test_render_conformance_skipped_when_none() -> None:
+    """No conformance section means the report says 'skipped'."""
+    renderer = EvaluationReportRenderer()
+    report = renderer.render(
+        test_path="wpt/foo/bar.html",
+        findings=[],
+        input_scope=_sample_scope(),
+        conformance=None,
+    )
+    assert "Conformance check: skipped (no spec provided)." in report
+    # The conformance-finding heading shape should NOT appear.
+    assert "Conformance finding" not in report
+
+
+def test_render_conformance_with_findings() -> None:
+    """A conformance section with findings renders them in their own block."""
+    renderer = EvaluationReportRenderer()
+    conformance = ConformanceSection(
+        spec_url="https://drafts.csswg.org/css-flexbox/",
+        findings=[_conformance_finding()],
+        input_scope=InputScope(approach="spec-conformance"),
+        requirements_xml_bytes=12_345,
+        cache_hit=True,
+    )
+    report = renderer.render(
+        test_path="wpt/foo/bar.html",
+        findings=[],
+        input_scope=_sample_scope(),
+        conformance=conformance,
+    )
+    assert "## Spec conformance" in report
+    assert "**Spec**: https://drafts.csswg.org/css-flexbox/" in report
+    assert "12,345 bytes (cache hit)" in report
+    assert "### Conformance finding 1 — assertion contradicts requirement" in (
+        report
+    )
+    assert "**Severity**: error" in report
+    assert "**Source**: `requirements.xml#R3`" in report
+    # Should not also render the "skipped" line.
+    assert "Conformance check: skipped" not in report
+
+
+def test_render_conformance_cache_miss_label() -> None:
+    """A fresh extraction (cache miss) is labeled distinctly from a hit."""
+    renderer = EvaluationReportRenderer()
+    conformance = ConformanceSection(
+        spec_url="https://drafts.csswg.org/css-flexbox/",
+        findings=[],
+        input_scope=InputScope(approach="spec-conformance"),
+        requirements_xml_bytes=2_048,
+        cache_hit=False,
+    )
+    report = renderer.render(
+        test_path="wpt/foo/bar.html",
+        findings=[],
+        input_scope=_sample_scope(),
+        conformance=conformance,
+    )
+    assert "2,048 bytes (freshly extracted)" in report
+    # Empty conformance findings should show the no-findings fallback in the
+    # conformance section.
+    assert "No conformance findings raised." in report
+
+
+# ---------------------------------------------------------------------------
+# run_evaluation with conformance pass (both agents mocked)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_evaluation_with_spec_url_runs_conformance_pass(
+    wpt_root_with_test: tuple[Path, Path],
+    evaluation_config: Config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When spec_url is provided, both agents run and conformance is rendered."""
+    _, test_path = wpt_root_with_test
+    output_dir = tmp_path / "out"
+
+    doc_inputs_payload = {
+        "findings": [],
+        "input_scope": {
+            "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
+            "dependencies_not_read": [],
+            "approach": "doc-inputs",
+        },
+    }
+    conformance_payload = {
+        "findings": [
+            {
+                "title": "contradicts requirement",
+                "severity": "error",
+                "test_line": "Line 12",
+                "evidence": "assert_equals(x, 'wrong')",
+                "source": "requirements.xml#R1",
+                "summary": "Spec requires 'right', not 'wrong'.",
+            }
+        ],
+        "input_scope": {
+            "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
+            "dependencies_not_read": [],
+            "approach": "spec-conformance",
+        },
+    }
+
+    mock_doc_inputs = AsyncMock(return_value=doc_inputs_payload)
+    mock_conformance = AsyncMock(return_value=conformance_payload)
+    mock_extract = AsyncMock(
+        return_value=("<requirements_list/>", False)  # not a cache hit
+    )
+
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_test_with_adk", mock_doc_inputs
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_conformance_with_adk",
+        mock_conformance,
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation._extract_requirements_for_spec",
+        mock_extract,
+    )
+
+    report_path = await run_evaluation(
+        test_path=test_path,
+        output_dir=output_dir,
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+        spec_url="https://drafts.csswg.org/css-flexbox/",
+    )
+
+    assert report_path is not None
+    contents = report_path.read_text(encoding="utf-8")
+
+    # Both agents were called.
+    mock_doc_inputs.assert_awaited_once()
+    mock_extract.assert_awaited_once()
+    mock_conformance.assert_awaited_once()
+
+    # Doc-inputs section renders empty findings.
+    assert "No findings raised." in contents
+    # Conformance section renders with the spec URL and the finding.
+    assert "## Spec conformance" in contents
+    assert "**Spec**: https://drafts.csswg.org/css-flexbox/" in contents
+    assert (
+        "### Conformance finding 1 — contradicts requirement" in contents
+    )
+    # Skipped message should not appear.
+    assert "Conformance check: skipped" not in contents
+
+
+@pytest.mark.asyncio
+async def test_run_evaluation_without_spec_skips_conformance(
+    wpt_root_with_test: tuple[Path, Path],
+    evaluation_config: Config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without spec_url, neither extraction nor conformance agent runs."""
+    _, test_path = wpt_root_with_test
+    output_dir = tmp_path / "out"
+
+    mock_doc_inputs = AsyncMock(
+        return_value={
+            "findings": [],
+            "input_scope": {
+                "files": [],
+                "dependencies_not_read": [],
+                "approach": "doc-inputs",
+            },
+        }
+    )
+    mock_conformance = AsyncMock()
+    mock_extract = AsyncMock()
+
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_test_with_adk", mock_doc_inputs
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_conformance_with_adk",
+        mock_conformance,
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation._extract_requirements_for_spec",
+        mock_extract,
+    )
+
+    report_path = await run_evaluation(
+        test_path=test_path,
+        output_dir=output_dir,
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+        spec_url=None,
+    )
+
+    assert report_path is not None
+    contents = report_path.read_text(encoding="utf-8")
+    assert "Conformance check: skipped (no spec provided)." in contents
+    mock_extract.assert_not_awaited()
+    mock_conformance.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_evaluation_with_spec_renders_skipped_when_extraction_fails(
+    wpt_root_with_test: tuple[Path, Path],
+    evaluation_config: Config,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If extraction returns None (fetch failed), conformance is omitted but
+    the doc-inputs report still writes."""
+    _, test_path = wpt_root_with_test
+    output_dir = tmp_path / "out"
+
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_test_with_adk",
+        AsyncMock(
+            return_value={
+                "findings": [],
+                "input_scope": {
+                    "files": [],
+                    "dependencies_not_read": [],
+                    "approach": "doc-inputs",
+                },
+            }
+        ),
+    )
+    mock_conformance = AsyncMock()
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.evaluate_conformance_with_adk",
+        mock_conformance,
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation._extract_requirements_for_spec",
+        AsyncMock(return_value=None),
+    )
+
+    report_path = await run_evaluation(
+        test_path=test_path,
+        output_dir=output_dir,
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+        spec_url="https://drafts.csswg.org/css-flexbox/",
+    )
+
+    assert report_path is not None
+    contents = report_path.read_text(encoding="utf-8")
+    # Conformance agent should NOT have been called.
+    mock_conformance.assert_not_awaited()
+    # Report degrades gracefully: shows "skipped" rather than half-rendered.
+    assert "Conformance check: skipped (no spec provided)." in contents
+
+
+# ---------------------------------------------------------------------------
+# _extract_requirements_for_spec (the shim)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_extract_requirements_for_spec_returns_none_on_fetch_failure(
+    evaluation_config: Config,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the spec fetch returns nothing, the shim returns None and does
+    not invoke the extractor."""
+    from wptgen.phases.evaluation import _extract_requirements_for_spec
+
+    fetch_mock = MagicMock(return_value=None)
+    extract_mock = AsyncMock()
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.fetch_and_extract_text", fetch_mock
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.run_requirements_extraction", extract_mock
+    )
+
+    result = await _extract_requirements_for_spec(
+        spec_url="https://example.com/spec/",
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+    )
+    assert result is None
+    extract_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_extract_requirements_for_spec_reports_cache_hit(
+    evaluation_config: Config,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the slugged cache file already exists, the shim flags a cache hit."""
+    from wptgen.phases.evaluation import _extract_requirements_for_spec
+
+    # Pre-create the cache file the shim will look for.
+    cache_dir = Path(evaluation_config.cache_path)  # type: ignore[arg-type]
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    # The slug computation must match the shim: scheme dropped, netloc + path
+    # lowercased, non-alnum runs replaced with single hyphen, stripped.
+    cache_file = cache_dir / "spec-example-com-spec__requirements.xml"
+    cache_file.write_text("<requirements_list/>", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.fetch_and_extract_text",
+        MagicMock(return_value="spec body"),
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.run_requirements_extraction",
+        AsyncMock(return_value="<requirements_list/>"),
+    )
+    # get_llm_client may try to construct a real client — stub it.
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.get_llm_client",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    result = await _extract_requirements_for_spec(
+        spec_url="https://example.com/spec/",
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+    )
+    assert result is not None
+    requirements_xml, cache_hit = result
+    assert requirements_xml == "<requirements_list/>"
+    assert cache_hit is True
+
+
+@pytest.mark.asyncio
+async def test_extract_requirements_for_spec_reports_cache_miss(
+    evaluation_config: Config,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no cache file exists yet, the shim flags a cache miss."""
+    from wptgen.phases.evaluation import _extract_requirements_for_spec
+
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.fetch_and_extract_text",
+        MagicMock(return_value="spec body"),
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.run_requirements_extraction",
+        AsyncMock(return_value="<requirements_list/>"),
+    )
+    monkeypatch.setattr(
+        "wptgen.phases.evaluation.get_llm_client",
+        MagicMock(return_value=MagicMock()),
+    )
+
+    result = await _extract_requirements_for_spec(
+        spec_url="https://fresh.example.com/never-cached/",
+        config=evaluation_config,
+        jinja_env=MagicMock(),
+        ui=MagicMock(),
+    )
+    assert result is not None
+    _, cache_hit = result
+    assert cache_hit is False
