@@ -98,19 +98,20 @@ async def evaluate_test_with_adk(
 
         Args:
             findings: A list of finding objects, each containing the
-                fields `title` (short description), `severity` (one of
-                "error", "warn", "info", "nit"), `test_line` (a line
-                reference into the test file), `evidence` (a short quote
-                or description), `source` (a `wpt/...:Lstart-Lend`
-                citation), and `summary` (a one-sentence paraphrase of
-                the upstream guidance).
+                fields `rule_id` (the `rules.yaml` rule that was
+                violated, e.g. "FMT-001"), `title` (short description),
+                `severity` (one of "error", "warn", "info", "nit"),
+                `test_line` (a line reference into the test file),
+                `evidence` (a short quote or description), `source` (the
+                rule's `wpt/...:Lstart-Lend` provenance), and `summary`
+                (a one-sentence paraphrase of the rule).
             input_scope: An object describing what was loaded, with the
                 fields `files` (a list of `{path, bytes, role}` rows
-                where `role` is one of "skill", "reading-list", "test",
-                or "dependency"), `dependencies_not_read` (a list of
+                where `role` is one of "skill", "rules", "test", or
+                "dependency"), `dependencies_not_read` (a list of
                 framework/external dependency paths that were detected
                 but not read), and `approach` (a stable label for the
-                evaluator variant, currently "doc-inputs").
+                evaluator variant, currently "distilled-yaml").
 
         Returns:
             A dictionary confirming receipt.

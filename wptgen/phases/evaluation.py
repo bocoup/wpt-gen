@@ -48,6 +48,7 @@ class Finding:
     evidence: str
     source: str  # e.g. "wpt/docs/writing-tests/general-guidelines.md:L82-L87"
     summary: str
+    rule_id: str = ""  # e.g. "FMT-001"; empty for findings not tied to a rule
 
 
 @dataclass
@@ -65,7 +66,7 @@ class InputScope:
 
     files: list[InputScopeFile] = field(default_factory=list)
     dependencies_not_read: list[str] = field(default_factory=list)
-    approach: str = "doc-inputs"
+    approach: str = "distilled-yaml"
 
     @property
     def total_bytes(self) -> int:
@@ -101,13 +102,11 @@ class EvaluationReportRenderer:
         self,
         test_path: str,
         findings: list[Finding],
-        input_scope: InputScope,
         conformance: ConformanceSection | None = None,
     ) -> str:
         return self.template.render(
             test_path=test_path,
             findings=findings,
-            input_scope=input_scope,
             conformance=conformance,
         )
 
@@ -128,6 +127,7 @@ def _payload_to_findings(payload: list[dict[str, Any]]) -> list[Finding]:
                 evidence=str(item.get("evidence", "")),
                 source=str(item.get("source", "")),
                 summary=str(item.get("summary", "")),
+                rule_id=str(item.get("rule_id", "")),
             )
         )
     return findings
@@ -148,7 +148,7 @@ def _payload_to_input_scope(payload: dict[str, Any]) -> InputScope:
     return InputScope(
         files=files,
         dependencies_not_read=[str(d) for d in deps],
-        approach=str(payload.get("approach", "doc-inputs")),
+        approach=str(payload.get("approach", "distilled-yaml")),
     )
 
 
@@ -283,7 +283,6 @@ async def run_evaluation(
     report_markdown = renderer.render(
         test_path=str(test_path),
         findings=findings,
-        input_scope=input_scope,
         conformance=conformance,
     )
 

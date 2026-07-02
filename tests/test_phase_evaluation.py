@@ -135,7 +135,7 @@ def test_payload_to_input_scope_tolerates_empty_payload() -> None:
     scope = _payload_to_input_scope({})
     assert scope.files == []
     assert scope.dependencies_not_read == []
-    assert scope.approach == "doc-inputs"  # default
+    assert scope.approach == "distilled-yaml"  # default
 
 
 def test_payload_to_input_scope_handles_none_lists() -> None:
@@ -192,8 +192,7 @@ def test_render_basic_finding() -> None:
     renderer = EvaluationReportRenderer()
     report = renderer.render(
         test_path="wpt/css/css-flexbox/align-content_center.html",
-        findings=[_sample_finding()],
-        input_scope=_sample_scope(),
+        findings=[_sample_finding(rule_id="FMT-001")],
     )
 
     # Top-level header
@@ -201,6 +200,7 @@ def test_render_basic_finding() -> None:
 
     # Finding section + fields
     assert "### Finding 1 — missing character encoding declaration" in report
+    assert "**Rule**: `FMT-001`" in report
     assert "**Severity**: warn" in report
     assert "**Test line**: Lines 1-4" in report
     assert (
@@ -220,7 +220,6 @@ def test_render_multiline_evidence_stays_inside_code_fence() -> None:
     report = renderer.render(
         test_path="wpt/foo/bar.html",
         findings=[_sample_finding(evidence=evidence)],
-        input_scope=_sample_scope(),
     )
 
     # Verify each line of the evidence is inside the fence (indented).
@@ -242,73 +241,18 @@ def test_render_empty_findings_shows_fallback() -> None:
     report = renderer.render(
         test_path="wpt/foo/bar.html",
         findings=[],
-        input_scope=_sample_scope(),
     )
     assert "No findings raised." in report
-    # Input scope still renders.
-    assert "## Input scope" in report
 
 
-def test_render_input_scope_table_format() -> None:
-    """The Input scope table uses comma-formatted bytes and a Total row."""
-    renderer = EvaluationReportRenderer()
-    scope = InputScope(
-        files=[
-            InputScopeFile(path="a.md", bytes=1_500, role="skill"),
-            InputScopeFile(path="b.md", bytes=12_345, role="reading-list"),
-            InputScopeFile(path="c.html", bytes=968, role="test"),
-        ],
-        approach="doc-inputs",
-    )
-    report = renderer.render(
-        test_path="wpt/c.html", findings=[], input_scope=scope
-    )
-
-    # Each row shows comma-formatted bytes.
-    assert "| a.md | 1,500 | skill |" in report
-    assert "| b.md | 12,345 | reading-list |" in report
-    assert "| c.html | 968 | test |" in report
-    # Total row matches total_bytes (1500 + 12345 + 968 = 14813).
-    assert "**Total** | **14,813**" in report
-    # Token estimate is total_bytes // 4 = 3703.
-    assert "Approximate input tokens: ~3,703" in report
-
-
-def test_render_no_dependencies_says_none() -> None:
+def test_render_finding_without_rule_id_omits_rule_line() -> None:
+    """A finding with no rule_id renders without a **Rule** line."""
     renderer = EvaluationReportRenderer()
     report = renderer.render(
         test_path="wpt/foo/bar.html",
-        findings=[],
-        input_scope=_sample_scope(dependencies_not_read=[]),
+        findings=[_sample_finding(rule_id="")],
     )
-    assert "Declared dependencies (not read): none" in report
-
-
-def test_render_dependencies_comma_separated() -> None:
-    renderer = EvaluationReportRenderer()
-    deps = ["/resources/testharness.js", "http://example.com/foo.js"]
-    report = renderer.render(
-        test_path="wpt/foo/bar.html",
-        findings=[],
-        input_scope=_sample_scope(dependencies_not_read=deps),
-    )
-    assert (
-        "Declared dependencies (not read): "
-        "/resources/testharness.js, http://example.com/foo.js"
-    ) in report
-
-
-def test_render_approach_label_appears() -> None:
-    """The approach label flows through to the rendered Markdown."""
-    renderer = EvaluationReportRenderer()
-    scope = _sample_scope(approach="some-other-variant")
-    report = renderer.render(
-        test_path="wpt/foo/bar.html",
-        findings=[],
-        input_scope=scope,
-    )
-    assert "Approach: some-other-variant" in report
-
+    assert "**Rule**:" not in report
 
 # ---------------------------------------------------------------------------
 # run_evaluation integration (agent mocked)
@@ -360,6 +304,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
     agent_payload = {
         "findings": [
             {
+                "rule_id": "FMT-001",
                 "title": "missing charset",
                 "severity": "warn",
                 "test_line": "Lines 1-4",
@@ -373,7 +318,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
         "input_scope": {
             "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
             "dependencies_not_read": [],
-            "approach": "doc-inputs",
+            "approach": "distilled-yaml",
         },
     }
 
@@ -395,7 +340,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
     contents = report_path.read_text(encoding="utf-8")
     assert "# Findings:" in contents
     assert "### Finding 1 — missing charset" in contents
-    assert "Approach: doc-inputs" in contents
+    assert "**Rule**: `FMT-001`" in contents
     mock_agent.assert_awaited_once()
     mock_ui.on_phase_start.assert_any_call(1, "Documentation Evaluation")
     mock_ui.report_findings_summary.assert_called_once()
@@ -455,7 +400,6 @@ def test_render_conformance_skipped_when_none() -> None:
     report = renderer.render(
         test_path="wpt/foo/bar.html",
         findings=[],
-        input_scope=_sample_scope(),
         conformance=None,
     )
     assert "Conformance check: skipped (no spec provided)." in report
@@ -475,7 +419,6 @@ def test_render_conformance_with_findings() -> None:
     report = renderer.render(
         test_path="wpt/foo/bar.html",
         findings=[],
-        input_scope=_sample_scope(),
         conformance=conformance,
     )
     assert "## Spec conformance" in report
@@ -502,7 +445,6 @@ def test_render_conformance_empty_findings_fallback() -> None:
     report = renderer.render(
         test_path="wpt/foo/bar.html",
         findings=[],
-        input_scope=_sample_scope(),
         conformance=conformance,
     )
     assert "2,048 bytes" in report
