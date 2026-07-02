@@ -45,6 +45,7 @@ EVALUATOR_TOOL_ALLOWLIST = frozenset(
         "search_files",
         "search_file_contents",
         "run_wpt_lint",
+        "run_lint_ext",
     }
 )
 

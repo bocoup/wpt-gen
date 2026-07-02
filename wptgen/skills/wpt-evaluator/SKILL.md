@@ -70,22 +70,37 @@ reviewer decides the remediation.
 2. **Load applicable rules** from `references/rules.yaml`, filtering
    to rules whose `applies_to` includes the detected kind(s) and any
    matching format tags (`html`, `js`, `css`, `worker`, `any`, etc.).
-3. **Evaluate the test file** against each applicable rule. Use the
-   rule's `rule` text as the normative statement and its `severity`
-   for the finding. Skip anything already covered by `wpt lint` (no
-   tabs, no trailing whitespace, no `setTimeout`,
-   `assert_throws`/`promise_rejects` deprecation, filename duplicate /
-   case-collision rules, etc.) to avoid double-flagging.
-4. **Open a rule's source doc only to disambiguate.** The rule `rule`
+3. **Run the linters first.** Call `run_wpt_lint` and `run_lint_ext`
+   on the test file. Together these own the `layer: deterministic`
+   rules: `run_wpt_lint` covers the checks upstream WPT enforces, and
+   `run_lint_ext` covers the deterministic rules from `rules.yaml` that
+   upstream does not (each `run_lint_ext` finding already carries the
+   `rule_id`). Any finding they report is authoritative; carry it
+   through to your submission as-is. The exact division — which rule id
+   each linter owns, and which deterministic-looking rules are actually
+   left to you because they have no clean mechanical check — is
+   documented in
+   [`references/linter-gap-analysis.md`](references/linter-gap-analysis.md);
+   consult it if you are unsure whether a given rule is a linter's job
+   or yours.
+4. **Evaluate the test against the `layer: semantic` rules only.** Use
+   each rule's `rule` text as the normative statement and its
+   `severity` for the finding. Do **not** re-judge deterministic rules
+   by hand — they are the linters' job (running the linters and
+   independently reasoning about the same rule risks contradictory or
+   duplicate findings). If you believe a deterministic rule is violated
+   but neither linter flagged it, trust the linters and move on.
+5. **Open a rule's source doc only to disambiguate.** The rule `rule`
    text is self-contained; read the upstream doc at the rule's
    `source` anchor only when a rule's applicability to this test is
    genuinely ambiguous and the surrounding context would resolve it.
    This should be the exception, not the norm.
-5. **Follow declared dependencies as needed** (see below) when reading
+6. **Follow declared dependencies as needed** (see below) when reading
    them would inform a specific rule.
-6. **Submit findings** by calling `report_evaluation_complete` with
-   `findings` and `input_scope` payloads. Each finding object must
-   populate the fields described in the Outputs section above,
+7. **Submit findings** by calling `report_evaluation_complete` with
+   `findings` and `input_scope` payloads. Combine your semantic
+   findings with the linter findings from step 3. Each finding object
+   must populate the fields described in the Outputs section above,
    including `rule_id`. Before submitting, verify no finding violates
    the prohibited outputs: no composite score, no proposed fix, no
    invented rule ID. The wpt-gen CLI renders the final Markdown report
@@ -179,8 +194,9 @@ carries:
   `testharness`, `reftest`, `manual`, `idl`, `visual`, `js`, `html`, `css`,
   `any`, `worker`). Used for filtering the corpus when loading into context.
 - `severity`: `error`, `warn`, `info`, or `nit`.
-- `layer`: `deterministic` (regex/AST checkable) or `semantic` (requires the
-  judge).
+- `layer`: `deterministic` (mechanically checkable — owned by the
+  linters, `run_wpt_lint` and `run_lint_ext`; do not re-judge these by
+  hand) or `semantic` (requires the judge — these are yours to evaluate).
 - `rule`: the normative statement. This is the self-contained text you
   evaluate the test against.
 

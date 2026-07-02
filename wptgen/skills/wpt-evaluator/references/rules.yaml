@@ -169,7 +169,7 @@ rules:
     category: filename
     applies_to: [html, js, testharness, reftest]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       Test feature flags (`.https`, `.h2`, `.www`, `.sub`, etc.) are preceded
       and followed by `.` and must go after any test type flag.
@@ -189,7 +189,7 @@ rules:
     category: filename
     applies_to: [html, js, testharness, reftest]
     severity: error
-    layer: deterministic
+    layer: semantic
     rule: |
       Tests requiring HTTPS must include `.https.` in the filename (e.g.,
       `test-secure.https.html`), or be the generated service worker test of
@@ -266,7 +266,7 @@ rules:
     category: metadata
     applies_to: [testharness, js]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       Specify a test title for `.window.js`, `.worker.js`, `.any.js`, or
       `.extension.js` using `// META: title=Your Title` at the beginning of
@@ -277,7 +277,7 @@ rules:
     category: metadata
     applies_to: [testharness, js]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       Include external JavaScript files using `// META: script=...` at the
       beginning of the resource, not by manually wiring up imports.
@@ -287,7 +287,7 @@ rules:
     category: metadata
     applies_to: [testharness, js]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       For tests that exceed the default timeout, use
       `// META: timeout=long` at the beginning of the resource.
@@ -354,7 +354,7 @@ rules:
     category: metadata
     applies_to: [reftest, print-reftest]
     severity: info
-    layer: deterministic
+    layer: semantic
     rule: |
       Print reftests may limit comparison to a subset of pages with
       `<meta name="reftest-pages" content="<range-specifier>">` (e.g.,
@@ -497,7 +497,7 @@ rules:
     category: structure
     applies_to: [reftest]
     severity: info
-    layer: deterministic
+    layer: semantic
     rule: |
       When subtle rendering differences (e.g., anti-aliasing) are expected,
       use `<meta name=fuzzy content="maxDifference=N;totalPixels=M">` (both
@@ -681,7 +681,7 @@ rules:
     category: api-usage
     applies_to: [testharness, reftest]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       To use WebDriver BiDi, enable the `bidi` feature by including
       `/resources/testdriver.js?feature=bidi` (or
@@ -693,7 +693,7 @@ rules:
     category: api-usage
     applies_to: [testharness, reftest]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       To use the testdriver Actions API, include
       `/resources/testdriver-actions.js` in addition to `testdriver.js`.
@@ -795,7 +795,7 @@ rules:
     category: portability
     applies_to: [html, js, testharness, reftest, manual]
     severity: info
-    layer: deterministic
+    layer: semantic
     rule: |
       Custom HTTP headers for a test are set via a sibling file with the
       same path plus a `.headers` suffix (e.g.,
@@ -917,7 +917,7 @@ rules:
     category: review
     applies_to: [testharness, js]
     severity: nit
-    layer: deterministic
+    layer: semantic
     rule: |
       Tests in a single file should be separated by one empty line.
 

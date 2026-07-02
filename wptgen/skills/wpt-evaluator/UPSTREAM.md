@@ -45,6 +45,22 @@ Rules currently draw from:
 - `wpt/docs/writing-tests/css-metadata.md`
 - `wpt/docs/reviewing-tests/checklist.md`
 
+## Deterministic rules and the linter extension
+
+Each rule carries a `layer` field: `deterministic` (mechanically checkable
+from a file's bytes, structure, or path) or `semantic` (requires rendering
+or judgment). The deterministic rules split further by whether upstream
+`wpt lint` already enforces them — those it covers are skipped by the
+evaluator; those it does not are the "gap set" implemented in
+`wptgen/lint_ext.py`, each check named with its `rules.yaml` id.
+
+The full mapping (covered / gap / reclassified-to-semantic) is documented
+in [`references/linter-gap-analysis.md`](references/linter-gap-analysis.md).
+It was determined against upstream's rule inventory at
+`wpt/tools/lint/rules.py` and `lint.py` as of the pinned commit above. Both
+the corpus and the upstream linter can change independently, so the mapping
+is not permanent — it must be re-checked on every refresh.
+
 ## Refresh procedure
 
 When upgrading to a newer upstream commit:
@@ -54,5 +70,17 @@ When upgrading to a newer upstream commit:
    reworded normative statements.
 3. Update `references/rules.yaml`: add new rules, deprecate removed ones, and
    reword existing ones whose source language has changed. Bump the `source`
-   line numbers if they have shifted.
-4. Update the pinned commit hash and date in this file.
+   line numbers if they have shifted. Set each rule's `layer` correctly
+   (`deterministic` only if decidable from bytes/structure/path — not if it
+   needs rendering or judgment).
+4. **Re-run the linter gap analysis.** Compare the current
+   `layer: deterministic` rules against upstream's rule inventory
+   (`wpt/tools/lint/rules.py` and `lint.py`). If upstream added a check that
+   now covers a gap rule, remove the corresponding check from
+   `wptgen/lint_ext.py` (and its test) to avoid double-flagging. If a newly
+   added or newly-`deterministic` corpus rule is NOT covered upstream, add it
+   to the gap set for implementation in `lint_ext.py`.
+5. Update the tables in
+   [`references/linter-gap-analysis.md`](references/linter-gap-analysis.md)
+   if the mapping changed.
+6. Update the pinned commit hash and date in this file.
