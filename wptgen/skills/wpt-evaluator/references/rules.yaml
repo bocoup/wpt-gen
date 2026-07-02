@@ -48,9 +48,14 @@ rules:
     severity: error
     layer: deterministic
     rule: |
-      Files must be encoded in UTF-8. In file formats where UTF-8 is not the
-      default encoding, they must contain metadata to mark them as such
-      (e.g., `<meta charset=utf-8>` in HTML files) or be pure ASCII.
+      Files must be encoded in UTF-8. This rule applies ONLY when a file
+      contains non-ASCII bytes in a format whose default encoding is not
+      UTF-8 (e.g., an HTML file with non-ASCII characters). In that case
+      the file must mark its encoding (e.g., `<meta charset=utf-8>` in
+      HTML). A pure-ASCII file, or one specifically testing encoding, does
+      NOT violate this rule regardless of whether a charset declaration is
+      present — do not flag a missing `<meta charset>` on an ASCII-only
+      file.
 
   - id: FMT-002
     source: wpt/docs/writing-tests/testharness.md#L60-L74
@@ -448,7 +453,7 @@ rules:
     category: structure
     applies_to: [reftest, visual]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       The test and reference should render within an 800x600 viewport, only
       displaying scrollbars if their presence is being tested.
@@ -470,7 +475,7 @@ rules:
     category: structure
     applies_to: [reftest]
     severity: info
-    layer: deterministic
+    layer: semantic
     rule: |
       With multiple references, the test passes if at least one `match`
       reference matches AND all `mismatch` references mismatch. Multiple
@@ -734,7 +739,7 @@ rules:
     category: portability
     applies_to: [reftest, visual, css]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       Fonts cannot be relied on to be installed or to have specific
       metrics. When a known font is needed, use Ahem loaded as a web font;
@@ -921,7 +926,7 @@ rules:
     category: review
     applies_to: [visual]
     severity: warn
-    layer: deterministic
+    layer: semantic
     rule: |
       Visual tests should render to a fixed, static page with no
       animation, within an 800x600 viewport.
