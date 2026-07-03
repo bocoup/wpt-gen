@@ -192,7 +192,7 @@ def test_render_basic_finding() -> None:
     renderer = EvaluationReportRenderer()
     report = renderer.render(
         test_path="wpt/css/css-flexbox/align-content_center.html",
-        findings=[_sample_finding(rule_id="FMT-001")],
+        findings=[_sample_finding(rule_id="GENERAL-005")],
     )
 
     # Top-level header
@@ -200,7 +200,7 @@ def test_render_basic_finding() -> None:
 
     # Finding section + fields
     assert "### Finding 1 — missing character encoding declaration" in report
-    assert "**Rule**: `FMT-001`" in report
+    assert "**Rule**: `GENERAL-005`" in report
     assert "**Severity**: warn" in report
     assert "**Test line**: Lines 1-4" in report
     assert (
@@ -305,7 +305,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
     agent_payload = {
         "findings": [
             {
-                "rule_id": "FMT-001",
+                "rule_id": "GENERAL-005",
                 "title": "missing charset",
                 "severity": "warn",
                 "test_line": "Lines 1-4",
@@ -341,7 +341,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
     contents = report_path.read_text(encoding="utf-8")
     assert "# Findings:" in contents
     assert "### Finding 1 — missing charset" in contents
-    assert "**Rule**: `FMT-001`" in contents
+    assert "**Rule**: `GENERAL-005`" in contents
     mock_agent.assert_awaited_once()
     mock_ui.on_phase_start.assert_any_call(1, "Documentation Evaluation")
     mock_ui.report_findings_summary.assert_called_once()

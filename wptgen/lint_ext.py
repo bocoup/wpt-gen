@@ -16,7 +16,7 @@
 This module implements the subset of `layer: deterministic` rules from
 `wptgen/skills/wpt-evaluator/references/rules.yaml` that upstream
 `wpt lint` does NOT already cover. Each check is named with its
-`rules.yaml` id (e.g. `NAME-007`) so the linter and the LLM evaluator
+`rules.yaml` id (e.g. `GENERAL-004`) so the linter and the LLM evaluator
 share one identifier space.
 
 """
@@ -104,19 +104,19 @@ class Regexp(abc.ABC):
 
 
 class CommentedOutCode(Regexp):
-    """REV-003: the test must not contain commented-out code."""
+    """CHECKLIST-008: the test must not contain commented-out code."""
 
     # A `//`-comment whose body looks like code: ends in `;`, `{`, or `}`,
     # or contains a call `foo(`. Deliberately conservative to limit false
     # positives on prose comments.
     pattern = rb"//\s*[A-Za-z_$][\w$.]*\s*\([^)]*\)\s*;?\s*$"
-    name = "REV-003"
+    name = "CHECKLIST-008"
     file_extensions = EXTENSIONS["js_all"]
     description = "Test-file line appears to contain commented-out code"
 
 
 class ManualExplicitTimeout(Regexp):
-    """API-005: manual testharness tests must pass {explicit_timeout: true}.
+    """MANUAL-004: manual testharness tests must pass {explicit_timeout: true}.
 
     Flags a `setup()` call that lacks `explicit_timeout`, but only in
     manual tests — `path_predicate` gates the check on the `-manual`
@@ -124,7 +124,7 @@ class ManualExplicitTimeout(Regexp):
     """
 
     pattern = rb"setup\((?![^)]*explicit_timeout)[^)]*\)"
-    name = "API-005"
+    name = "MANUAL-004"
     file_extensions = EXTENSIONS["markup"]
     path_predicate = staticmethod(is_manual_test)
     description = (
@@ -134,7 +134,7 @@ class ManualExplicitTimeout(Regexp):
 
 
 class DeprecatedCssFlag(Regexp):
-    """META-008: deprecated `<meta name=flags>` tokens for CSS tests.
+    """CSS-METADATA-003: deprecated `<meta name=flags>` tokens for CSS tests.
 
     The tokens `animated`, `font`, `history`, `interact`, `speech`, and
     `userstyle` are deprecated for new CSS tests; such tests should use the
@@ -146,7 +146,7 @@ class DeprecatedCssFlag(Regexp):
         rb'<meta\s+name=["\']?flags["\']?\s+content=["\'][^"\']*'
         rb"\b(animated|font|history|interact|speech|userstyle)\b"
     )
-    name = "META-008"
+    name = "CSS-METADATA-003"
     file_extensions = EXTENSIONS["markup"]
     description = (
         "`<meta name=flags>` uses a token deprecated for new CSS tests "
@@ -158,16 +158,16 @@ class DeprecatedCssFlag(Regexp):
 # Filename gap rules (path logic, no file contents needed)
 # ---------------------------------------------------------------------------
 
-# NOTE: NAME-007 ("tests requiring HTTPS must carry `.https.`") is NOT
+# NOTE: GENERAL-004 ("tests requiring HTTPS must carry `.https.`") is NOT
 # implemented here. Whether a test *requires* a secure context is a
 # semantic property — no fixed regex over API names can decide it
 # completely, and scanning full file content for that proxy is both
-# noisy and the slowest possible check. NAME-007 is `layer: semantic` in
+# noisy and the slowest possible check. GENERAL-004 is `layer: semantic` in
 # rules.yaml and left to the LLM judge.
 
 
 def check_manual_suffix_position(path: str) -> Error | None:
-    """NAME-004 / NAME-010: `-manual` must be the last `-` element.
+    """FILENAMES-001 / MANUAL-002: `-manual` must be the last `-` element.
 
     `foo-manual.html` is a manual test; `foo-manual-other.html` is not,
     and if a file carries `-manual` anywhere but immediately before the
@@ -177,7 +177,7 @@ def check_manual_suffix_position(path: str) -> Error | None:
     stem, _ = os.path.splitext(base)
     if "-manual" in stem and not stem.endswith("-manual"):
         return (
-            "NAME-004",
+            "FILENAMES-001",
             "`-manual` appears in the filename but is not the last `-` "
             "element before the extension",
             path,
@@ -187,7 +187,7 @@ def check_manual_suffix_position(path: str) -> Error | None:
 
 
 def check_crash_suffix_position(path: str) -> Error | None:
-    """NAME-011: `-crash` must be immediately before the extension.
+    """CRASHTEST-001: `-crash` must be immediately before the extension.
 
     A file with `-crash` mid-stem (e.g. `bar-crash-001.html`) is NOT a
     crashtest and the misplaced flag is a likely mistake — unless the file
@@ -199,7 +199,7 @@ def check_crash_suffix_position(path: str) -> Error | None:
     stem, _ = os.path.splitext(parts[-1])
     if "-crash" in stem and not stem.endswith("-crash"):
         return (
-            "NAME-011",
+            "CRASHTEST-001",
             "`-crash` appears in the filename but is not immediately before "
             "the extension; such a file is not treated as a crashtest",
             path,
@@ -209,7 +209,7 @@ def check_crash_suffix_position(path: str) -> Error | None:
 
 
 def check_print_suffix_position(path: str) -> Error | None:
-    """NAME-012: `-print` must be immediately before the extension.
+    """PRINT-REFTESTS-001: `-print` must be immediately before the extension.
 
     A file with `-print` mid-stem (e.g. `bar-print-001.html`) is NOT a
     print reftest — unless it lives under a `print/` directory, where the
@@ -221,7 +221,7 @@ def check_print_suffix_position(path: str) -> Error | None:
     stem, _ = os.path.splitext(parts[-1])
     if "-print" in stem and not stem.endswith("-print"):
         return (
-            "NAME-012",
+            "PRINT-REFTESTS-001",
             "`-print` appears in the filename but is not immediately before "
             "the extension; such a file is not treated as a print reftest",
             path,
@@ -231,7 +231,7 @@ def check_print_suffix_position(path: str) -> Error | None:
 
 
 def check_multiglobal_extension(path: str) -> Error | None:
-    """NAME-006: `.window`, `.worker`, `.any` must be immediately followed
+    """FILENAMES-005: `.window`, `.worker`, `.any` must be immediately followed
     by the final `.js` extension.
 
     `foo.any.js` is correct; `foo.any.bar.js` (the token not immediately
@@ -243,7 +243,7 @@ def check_multiglobal_extension(path: str) -> Error | None:
     for token in (".window", ".worker", ".any"):
         if token in base and not base.endswith(f"{token}.js"):
             return (
-                "NAME-006",
+                "FILENAMES-005",
                 f"`{token}` should be immediately followed by the final "
                 f"`.js` extension",
                 path,
@@ -263,7 +263,7 @@ _DONE_CALL_RE = re.compile(rb"\bdone\s*\(\s*\)")
 
 
 def check_worker_boilerplate(path: str, content: bytes) -> Error | None:
-    """FMT-004: a `.worker.js` file must importScripts testharness.js and
+    """TESTHARNESS-003: a `.worker.js` file must importScripts testharness.js and
     call done().
 
     Only runs for `.worker.js` files (gated by the driver), so the content
@@ -271,7 +271,7 @@ def check_worker_boilerplate(path: str, content: bytes) -> Error | None:
     """
     if not _IMPORT_TESTHARNESS_RE.search(content):
         return (
-            "FMT-004",
+            "TESTHARNESS-003",
             "`.worker.js` file does not importScripts "
             "`/resources/testharness.js`",
             path,
@@ -279,7 +279,7 @@ def check_worker_boilerplate(path: str, content: bytes) -> Error | None:
         )
     if not _DONE_CALL_RE.search(content):
         return (
-            "FMT-004",
+            "TESTHARNESS-003",
             "`.worker.js` file does not call `done()`",
             path,
             None,

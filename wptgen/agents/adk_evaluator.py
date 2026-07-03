@@ -113,7 +113,7 @@ async def evaluate_test_with_adk(
         Args:
             findings: A list of finding objects, each containing the
                 fields `rule_id` (the `rules.yaml` rule that was
-                violated, e.g. "FMT-001"), `title` (short description),
+                violated, e.g. "GENERAL-005"), `title` (short description),
                 `severity` (one of "error", "warn", "info", "nit"),
                 `test_line` (a line reference into the test file),
                 `evidence` (a short quote or description), `source` (the

@@ -291,13 +291,13 @@ def test_run_lint_ext_reports_findings(
     agent_tools: dict[str, FunctionTool], wpt_root: Path
 ) -> None:
     """run_lint_ext surfaces a deterministic finding with its rule_id."""
-    # `-manual` not last before the extension -> NAME-004.
+    # `-manual` not last before the extension -> FILENAMES-001.
     target = wpt_root / "bar-manual-extra.html"
     target.write_text("<!doctype html>", encoding="utf-8")
 
     res = agent_tools["run_lint_ext"].func(file_path="bar-manual-extra.html")
     assert res["status"] == "failed"
-    assert any(f["rule_id"] == "NAME-004" for f in res["findings"])
+    assert any(f["rule_id"] == "FILENAMES-001" for f in res["findings"])
 
 
 def test_run_lint_ext_clean_file(

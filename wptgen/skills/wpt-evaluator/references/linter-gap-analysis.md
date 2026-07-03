@@ -25,17 +25,17 @@ anything covered by `wpt lint`"). wpt-gen does not re-check them.
 
 | rules.yaml | upstream lint rule |
 | ---------- | ------------------ |
-| FMT-002    | `MISSING-TESTHARNESSREPORT` / `MULTIPLE-TESTHARNESS` |
-| FMT-003    | `TESTHARNESS-PATH` / `TESTHARNESS-IN-OTHER-TYPE` / `EARLY-TESTHARNESSREPORT` |
-| NAME-001   | `PATH LENGTH` |
-| NAME-003   | `DUPLICATE-BASENAME-PATH` / `DUPLICATE-CASE-INSENSITIVE-PATH` |
-| NAME-010 / NAME-013 | `CONTENT-MANUAL` / `CONTENT-VISUAL` |
-| META-004   | `VARIANT-MISSING` / `MALFORMED-VARIANT` |
-| META-005   | `MISSING-LINK` |
-| API-006    | `MISSING-TESTDRIVER-VENDOR` / `MULTIPLE-TESTDRIVER` / `TESTDRIVER-PATH` |
-| STRUCT-007 | `MISSING-REFTESTWAIT` |
-| STRUCT-001 (partial) | `NON-EXISTENT-REF` / `SAME-FILE-REF` / `ABSOLUTE-URL-REF` |
-| PORT-006 (partial)   | `W3C-TEST.ORG` / `WEB-PLATFORM.TEST` (hardcoded-host strings only) |
+| TESTHARNESS-001    | `MISSING-TESTHARNESSREPORT` / `MULTIPLE-TESTHARNESS` |
+| TESTHARNESS-007    | `TESTHARNESS-PATH` / `TESTHARNESS-IN-OTHER-TYPE` / `EARLY-TESTHARNESSREPORT` |
+| GENERAL-001   | `PATH LENGTH` |
+| GENERAL-003   | `DUPLICATE-BASENAME-PATH` / `DUPLICATE-CASE-INSENSITIVE-PATH` |
+| MANUAL-002 / VISUAL-001 | `CONTENT-MANUAL` / `CONTENT-VISUAL` |
+| TESTHARNESS-009   | `VARIANT-MISSING` / `MALFORMED-VARIANT` |
+| CSS-METADATA-001   | `MISSING-LINK` |
+| TESTDRIVER-002    | `MISSING-TESTDRIVER-VENDOR` / `MULTIPLE-TESTDRIVER` / `TESTDRIVER-PATH` |
+| REFTESTS-005 | `MISSING-REFTESTWAIT` |
+| REFTESTS-001 (partial) | `NON-EXISTENT-REF` / `SAME-FILE-REF` / `ABSOLUTE-URL-REF` |
+| SERVER-FEATURES-002 (partial)   | `W3C-TEST.ORG` / `WEB-PLATFORM.TEST` (hardcoded-host strings only) |
 
 ## Gap rules — implemented in the linter extension
 
@@ -47,14 +47,14 @@ identifier space.
 
 | rules.yaml | severity | check |
 | ---------- | -------- | ----- |
-| FMT-004    | error | `.worker.js` must `importScripts` testharness.js + call `done()` (content, gated on `.worker.js`) |
-| NAME-004   | error | `-manual` must be the last `-` element before the extension (filename) |
-| NAME-006   | warn | `.window`/`.worker`/`.any` must be immediately before the final `.js` (filename) |
-| NAME-011   | error | `-crash` must be immediately before the extension, unless under `crashtests/` (filename) |
-| NAME-012   | error | `-print` must be immediately before the extension, unless under `print/` (filename) |
-| META-008   | warn | `<meta name=flags>` uses a deprecated CSS token (line) |
-| API-005    | error | manual testharness `setup()` lacks `{explicit_timeout: true}` (line, gated on `-manual`) |
-| REV-003    | warn | commented-out code (line, conservative regex) |
+| TESTHARNESS-003    | error | `.worker.js` must `importScripts` testharness.js + call `done()` (content, gated on `.worker.js`) |
+| FILENAMES-001   | error | `-manual` must be the last `-` element before the extension (filename) |
+| FILENAMES-005   | warn | `.window`/`.worker`/`.any` must be immediately before the final `.js` (filename) |
+| CRASHTEST-001   | error | `-crash` must be immediately before the extension, unless under `crashtests/` (filename) |
+| PRINT-REFTESTS-001   | error | `-print` must be immediately before the extension, unless under `print/` (filename) |
+| CSS-METADATA-003   | warn | `<meta name=flags>` uses a deprecated CSS token (line) |
+| MANUAL-004    | error | manual testharness `setup()` lacks `{explicit_timeout: true}` (line, gated on `-manual`) |
+| CHECKLIST-008    | warn | commented-out code (line, conservative regex) |
 
 ## Not implemented — left to the LLM judge
 
@@ -63,32 +63,32 @@ lands here:
 
 **Requires rendering or intent judgment** — not decidable from bytes:
 
-- **STRUCT-004** — "render within 800×600" (requires rendering)
-- **STRUCT-006** — reftest match/mismatch pass semantics (runtime)
-- **REV-007** — "fixed, static page with no animation" (requires rendering)
-- **PORT-003** — Ahem when "a known font is needed" (intent judgment)
-- **NAME-007** — whether a test *requires* HTTPS is semantic; no fixed API
+- **CHECKLIST-013** — "render within 800×600" (requires rendering)
+- **REFTESTS-004** — reftest match/mismatch pass semantics (runtime)
+- **CHECKLIST-020** — "fixed, static page with no animation" (requires rendering)
+- **GENERAL-010** — Ahem when "a known font is needed" (intent judgment)
+- **GENERAL-004** — whether a test *requires* HTTPS is semantic; no fixed API
   list decides it, and scanning full content for that proxy is slow and
   incomplete.
 
 **No clean deterministic signal** — checkable in principle, but a byte-level
 check would be too noisy or false-positive-prone to be worth it:
 
-- **NAME-005** — feature-flag vs. type-flag ordering: real filenames mix `-`
+- **FILENAMES-002** — feature-flag vs. type-flag ordering: real filenames mix `-`
   and `.` delimited tokens (e.g. `foo-visual.manual.html`), so violations
   are not cleanly expressible.
-- **STRUCT-008 / META-009** — `fuzzy` / `reftest-pages` well-formedness: real
+- **REFTESTS-006 / PRINT-REFTESTS-003** — `fuzzy` / `reftest-pages` well-formedness: real
   content uses positional `range;range` forms and template placeholders that
   a strict validator would false-positive on.
-- **META-001 / META-002 / META-003** — recommend `// META: title/script/timeout`:
+- **TESTHARNESS-005 / TESTHARNESS-006 / TESTHARNESS-008** — recommend `// META: title/script/timeout`:
   flagging the *absence* of an optional-but-recommended directive is high-noise
   and closer to a judgment call.
-- **API-002 / API-008 / API-009** — conditional includes ("to use X, include
+- **IDLHARNESS-002 / TESTDRIVER-003 / TESTDRIVER-004** — conditional includes ("to use X, include
   Y"): only apply *if* the test uses that API, which is itself a content/intent
   judgment.
-- **PORT-008** — the `.headers` sibling-file convention describes how to set
+- **SERVER-FEATURES-003** — the `.headers` sibling-file convention describes how to set
   headers; there is no clear violation to detect.
-- **REV-006** — "one blank line between tests" is a `nit` requiring
+- **CHECKLIST-019** — "one blank line between tests" is a `nit` requiring
   test-block boundary parsing for marginal value.
 
 ## Why the split falls where it does

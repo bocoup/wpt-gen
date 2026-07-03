@@ -49,7 +49,7 @@ For each issue, a finding with these fields:
 Strategy-specific fields:
 
 - **`distilled`**: also include `rule_id` (the `rules.yaml` rule violated,
-  e.g. `ASSERT-001`). `severity` is taken from the rule. `source` is the
+  e.g. `CHECKLIST-017`). `severity` is taken from the rule. `source` is the
   rule's `source` provenance, copied through from the rule.
 - **`raw`**: `source` is the upstream doc path + line range that prompted
   the finding (e.g., `wpt/docs/writing-tests/general-guidelines.md:L82-L87`).
@@ -213,7 +213,7 @@ Applies when `strategy: distilled`. All rules live in
 [`references/rules.yaml`](references/rules.yaml). Each rule carries:
 
 - `id`: stable identifier, prefixed with the category code (e.g.,
-  `ASSERT-001`, `STRUCT-003`). This is what you report as a finding's
+  `CHECKLIST-017`, `CHECKLIST-012`). This is what you report as a finding's
   `rule_id`.
 - `source`: provenance — a repo-root-relative path whose first segment
   identifies the originating repository (`wpt/...` for upstream
