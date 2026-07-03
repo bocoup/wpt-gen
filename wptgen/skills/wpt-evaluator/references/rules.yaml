@@ -551,13 +551,13 @@ rules:
   - id: STRUCT-013
     source: wpt/docs/writing-tests/rendering.md#L8-L24
     category: structure
-    applies_to: [reftest, visual]
+    applies_to: [visual]
     severity: warn
     layer: semantic
     rule: |
-      Rendering tests should indicate success with a recognizable visual
-      pattern — typically a green paragraph ("This text should be
-      green") or a green square. The green square is often layered over
+      Visual (manually judged) rendering tests should indicate success
+      with a recognizable green pattern — typically a green paragraph
+      ("This text should be green") or a green square, often layered over
       a red square so misalignment exposes red.
 
   - id: STRUCT-014
@@ -568,22 +568,22 @@ rules:
     layer: semantic
     rule: |
       Rendering tests should be designed so that failures are visually
-      obvious. Use red to expose alignment/painting failures, design
-      `line-height`/`font-size` tests so failures cause text overlap,
-      or use properties like `quotes`/`content` to render the literal
-      text "FAIL" on failure.
+      obvious. Use red to expose alignment/painting failures (so a
+      few-pixel misrender uncovers red), design `line-height`/`font-size`
+      tests so failures cause text overlap, or use properties like
+      `quotes`/`content` to render the literal text "FAIL" on failure.
 
   - id: STRUCT-015
     source: wpt/docs/writing-tests/rendering.md#L26-L35
     category: structure
-    applies_to: [reftest, visual]
+    applies_to: [visual]
     severity: warn
     layer: semantic
     rule: |
-      When the entire canvas is rendered green, take care that the test
-      does not result in a passing-looking single green paragraph if it
-      fails. Typically the short descriptive paragraph is forced to a
-      neutral color (e.g., white).
+      In a visual (manually judged) test where the entire canvas is
+      rendered green, take care that a failure does not still look like a
+      passing single green paragraph. Typically the short descriptive
+      paragraph is forced to a neutral color (e.g., white).
 
   - id: STRUCT-016
     source: wpt/docs/writing-tests/visual.md#L17-L27
