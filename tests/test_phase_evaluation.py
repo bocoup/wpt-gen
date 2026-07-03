@@ -117,7 +117,7 @@ def test_payload_to_input_scope_full() -> None:
             "/resources/testharness.js",
             "http://example.com",
         ],
-        "approach": "doc-inputs",
+        "strategy": "raw",
     }
     scope = _payload_to_input_scope(payload)
     assert len(scope.files) == 2
@@ -128,14 +128,14 @@ def test_payload_to_input_scope_full() -> None:
         "/resources/testharness.js",
         "http://example.com",
     ]
-    assert scope.approach == "doc-inputs"
+    assert scope.strategy == "raw"
 
 
 def test_payload_to_input_scope_tolerates_empty_payload() -> None:
     scope = _payload_to_input_scope({})
     assert scope.files == []
     assert scope.dependencies_not_read == []
-    assert scope.approach == "distilled-yaml"  # default
+    assert scope.strategy == "distilled"  # default
 
 
 def test_payload_to_input_scope_handles_none_lists() -> None:
@@ -181,7 +181,7 @@ def _sample_scope(**overrides: Any) -> InputScope:
             ),
         ],
         "dependencies_not_read": [],
-        "approach": "doc-inputs",
+        "strategy": "raw",
     }
     defaults.update(overrides)
     return InputScope(**defaults)
@@ -318,7 +318,7 @@ async def test_run_evaluation_writes_report_when_agent_succeeds(
         "input_scope": {
             "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
             "dependencies_not_read": [],
-            "approach": "distilled-yaml",
+            "strategy": "distilled",
         },
     }
 
@@ -413,7 +413,7 @@ def test_render_conformance_with_findings() -> None:
     conformance = ConformanceSection(
         spec_url="https://drafts.csswg.org/css-flexbox/",
         findings=[_conformance_finding()],
-        input_scope=InputScope(approach="spec-conformance"),
+        input_scope=InputScope(strategy="distilled"),
         requirements_xml_bytes=12_345,
     )
     report = renderer.render(
@@ -439,7 +439,7 @@ def test_render_conformance_empty_findings_fallback() -> None:
     conformance = ConformanceSection(
         spec_url="https://drafts.csswg.org/css-flexbox/",
         findings=[],
-        input_scope=InputScope(approach="spec-conformance"),
+        input_scope=InputScope(strategy="distilled"),
         requirements_xml_bytes=2_048,
     )
     report = renderer.render(
@@ -473,7 +473,7 @@ async def test_run_evaluation_with_spec_url_runs_conformance_pass(
         "input_scope": {
             "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
             "dependencies_not_read": [],
-            "approach": "doc-inputs",
+            "strategy": "raw",
         },
     }
     conformance_payload = {
@@ -490,7 +490,7 @@ async def test_run_evaluation_with_spec_url_runs_conformance_pass(
         "input_scope": {
             "files": [{"path": "foo.html", "bytes": 30, "role": "test"}],
             "dependencies_not_read": [],
-            "approach": "spec-conformance",
+            "strategy": "distilled",
         },
     }
 
@@ -562,7 +562,7 @@ async def test_run_evaluation_without_spec_skips_conformance(
                     "input_scope": {
                         "files": [],
                         "dependencies_not_read": [],
-                        "approach": "doc-inputs",
+                        "strategy": "raw",
                     },
                 },
                 TokenUsage(),
@@ -603,7 +603,7 @@ async def test_run_evaluation_with_spec_renders_skipped_when_extraction_fails(
     mocker: MockerFixture,
 ) -> None:
     """If extraction returns None (fetch failed), conformance is omitted but
-    the doc-inputs report still writes."""
+    the raw-strategy report still writes."""
     _, test_path = wpt_root_with_test
     output_dir = tmp_path / "out"
 
@@ -616,7 +616,7 @@ async def test_run_evaluation_with_spec_renders_skipped_when_extraction_fails(
                     "input_scope": {
                         "files": [],
                         "dependencies_not_read": [],
-                        "approach": "doc-inputs",
+                        "strategy": "raw",
                     },
                 },
                 TokenUsage(),
