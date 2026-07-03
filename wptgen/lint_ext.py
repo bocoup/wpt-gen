@@ -1,3 +1,16 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Deterministic linter extension for wpt-gen.
 
 This module implements the subset of `layer: deterministic` rules from
@@ -40,6 +53,7 @@ def is_worker_js(path: str) -> bool:
     """A `.worker.js` test file."""
     return os.path.basename(path).endswith(".worker.js")
 
+
 # File-extension groups, mirrored from upstream lint so `file_extensions`
 # on a check reads the same way it does there.
 EXTENSIONS: dict[str, list[str]] = {
@@ -49,7 +63,9 @@ EXTENSIONS: dict[str, list[str]] = {
     "js": [".js", ".mjs"],
     "python": [".py"],
 }
-EXTENSIONS["markup"] = EXTENSIONS["html"] + EXTENSIONS["xhtml"] + EXTENSIONS["svg"]
+EXTENSIONS["markup"] = (
+    EXTENSIONS["html"] + EXTENSIONS["xhtml"] + EXTENSIONS["svg"]
+)
 EXTENSIONS["js_all"] = EXTENSIONS["markup"] + EXTENSIONS["js"]
 
 
@@ -93,7 +109,7 @@ class CommentedOutCode(Regexp):
     # A `//`-comment whose body looks like code: ends in `;`, `{`, or `}`,
     # or contains a call `foo(`. Deliberately conservative to limit false
     # positives on prose comments.
-    pattern = br"//\s*[A-Za-z_$][\w$.]*\s*\([^)]*\)\s*;?\s*$"
+    pattern = rb"//\s*[A-Za-z_$][\w$.]*\s*\([^)]*\)\s*;?\s*$"
     name = "REV-003"
     file_extensions = EXTENSIONS["js_all"]
     description = "Test-file line appears to contain commented-out code"
@@ -107,7 +123,7 @@ class ManualExplicitTimeout(Regexp):
     filename so ordinary tests' `setup()` calls are not flagged.
     """
 
-    pattern = br"setup\((?![^)]*explicit_timeout)[^)]*\)"
+    pattern = rb"setup\((?![^)]*explicit_timeout)[^)]*\)"
     name = "API-005"
     file_extensions = EXTENSIONS["markup"]
     path_predicate = staticmethod(is_manual_test)
@@ -127,8 +143,8 @@ class DeprecatedCssFlag(Regexp):
     """
 
     pattern = (
-        br'<meta\s+name=["\']?flags["\']?\s+content=["\'][^"\']*'
-        br"\b(animated|font|history|interact|speech|userstyle)\b"
+        rb'<meta\s+name=["\']?flags["\']?\s+content=["\'][^"\']*'
+        rb"\b(animated|font|history|interact|speech|userstyle)\b"
     )
     name = "META-008"
     file_extensions = EXTENSIONS["markup"]
@@ -292,7 +308,9 @@ _PATH_CHECKS: list[Callable[[str], Error | None]] = [
 
 # Content checks need full file bytes. Each is paired with a filename
 # predicate so content is only read when at least one applies.
-_CONTENT_CHECKS: list[tuple[Callable[[str], bool], Callable[[str, bytes], Error | None]]] = [
+_CONTENT_CHECKS: list[
+    tuple[Callable[[str], bool], Callable[[str, bytes], Error | None]]
+] = [
     (is_worker_js, check_worker_boilerplate),
 ]
 

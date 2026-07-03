@@ -21,7 +21,7 @@
 # See ../UPSTREAM.md for the pinned upstream commit and refresh procedure.
 # See ../SKILL.md for how this corpus is consumed.
 
-version: 0.4.0
+version: 0.1.0
 wpt_upstream_commit: fbe57e07f26f4e9b45bdf7647b4cbf1e1a4563dd
 
 # Category codes (used as rule ID prefixes):

@@ -254,6 +254,7 @@ def test_render_finding_without_rule_id_omits_rule_line() -> None:
     )
     assert "**Rule**:" not in report
 
+
 # ---------------------------------------------------------------------------
 # run_evaluation integration (agent mocked)
 # ---------------------------------------------------------------------------
