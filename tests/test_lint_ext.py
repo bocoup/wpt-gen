@@ -36,11 +36,15 @@ def test_clean_reftest_has_no_gap_findings() -> None:
 
 
 def test_name_004_flags_manual_suffix_not_last() -> None:
-    assert "FILENAMES-001" in _rule_ids("bar-manual-other.html", b"<!doctype html>")
+    assert "FILENAMES-001" in _rule_ids(
+        "bar-manual-other.html", b"<!doctype html>"
+    )
 
 
 def test_name_004_quiet_when_manual_is_last() -> None:
-    assert "FILENAMES-001" not in _rule_ids("bar-manual.html", b"<!doctype html>")
+    assert "FILENAMES-001" not in _rule_ids(
+        "bar-manual.html", b"<!doctype html>"
+    )
 
 
 def test_rev_003_flags_commented_out_code() -> None:
@@ -69,11 +73,15 @@ def test_api_005_quiet_on_non_manual_test() -> None:
 
 
 def test_name_011_flags_crash_suffix_not_last() -> None:
-    assert "CRASHTEST-001" in _rule_ids("bar-crash-001.html", b"<!doctype html>")
+    assert "CRASHTEST-001" in _rule_ids(
+        "bar-crash-001.html", b"<!doctype html>"
+    )
 
 
 def test_name_011_quiet_when_crash_is_last() -> None:
-    assert "CRASHTEST-001" not in _rule_ids("bar-crash.html", b"<!doctype html>")
+    assert "CRASHTEST-001" not in _rule_ids(
+        "bar-crash.html", b"<!doctype html>"
+    )
 
 
 def test_name_011_quiet_under_crashtests_dir() -> None:
@@ -82,11 +90,15 @@ def test_name_011_quiet_under_crashtests_dir() -> None:
 
 
 def test_name_012_flags_print_suffix_not_last() -> None:
-    assert "PRINT-REFTESTS-001" in _rule_ids("bar-print-001.html", b"<!doctype html>")
+    assert "PRINT-REFTESTS-001" in _rule_ids(
+        "bar-print-001.html", b"<!doctype html>"
+    )
 
 
 def test_name_012_quiet_under_print_dir() -> None:
-    assert "PRINT-REFTESTS-001" not in _rule_ids("css/print/bar-print-1.html", b"x")
+    assert "PRINT-REFTESTS-001" not in _rule_ids(
+        "css/print/bar-print-1.html", b"x"
+    )
 
 
 def test_name_006_flags_token_not_before_js() -> None:

@@ -51,7 +51,9 @@ class Finding:
     evidence: str
     source: str  # e.g. "wpt/docs/writing-tests/general-guidelines.md:L82-L87"
     summary: str
-    rule_id: str = ""  # e.g. "GENERAL-005"; empty for findings not tied to a rule
+    rule_id: str = (
+        ""  # e.g. "GENERAL-005"; empty for findings not tied to a rule
+    )
 
 
 @dataclass
