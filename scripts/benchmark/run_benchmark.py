@@ -184,6 +184,27 @@ def _rep_dir(out: Path, entry_id: str, repeat: int) -> Path:
     return out / "runs" / entry_id / f"rep-{repeat}"
 
 
+class Progress:
+    """Prints one stderr line per evaluator invocation"""
+
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.done = 0
+
+    def start_repeat(self, entry_id: str, repeat: int, repeats: int) -> None:
+        sys.stderr.write(
+            f"[{self.done + 1}/{self.total}] {entry_id} "
+            f"rep {repeat + 1}/{repeats} ... "
+        )
+        sys.stderr.flush()
+
+    def end_repeat(self, exit_code: int, elapsed: float) -> None:
+        self.done += 1
+        status = "ok" if exit_code == 0 else f"FAILED ({exit_code})"
+        sys.stderr.write(f"{status} {elapsed:.1f}s\n")
+        sys.stderr.flush()
+
+
 def run_entry(
     entry: BenchmarkEntry,
     manifest: Manifest,
@@ -192,6 +213,7 @@ def run_entry(
     repeats: int,
     provider: str | None,
     config: Path,
+    progress: Progress | None = None,
 ) -> list[RunRecord]:
     """Invokes ``wpt-gen evaluate`` ``repeats`` times for one entry."""
     records: list[RunRecord] = []
@@ -215,6 +237,8 @@ def run_entry(
         if provider:
             cmd += ["--provider", provider]
 
+        if progress:
+            progress.start_repeat(entry.entry_id, i, repeats)
         started = time.monotonic()
         completed = subprocess.run(  # noqa: S603 - fixed argv, no shell
             cmd,
@@ -223,6 +247,8 @@ def run_entry(
             check=False,
         )
         elapsed = time.monotonic() - started
+        if progress:
+            progress.end_repeat(completed.returncode, elapsed)
         if completed.returncode != 0:
             # Record it and move on; an errored repeat scores as an empty
             # run (no findings) and still counts in the denominator.
@@ -832,6 +858,7 @@ def main(argv: list[str] | None = None) -> int:
             if seed_entries:
                 stage_seeds(seeds_root, args.wpt_dir, seed_entries)
                 staged = True
+            progress = Progress(total=len(entries) * args.repeats)
             for entry in entries:
                 run_records.extend(
                     run_entry(
@@ -842,6 +869,7 @@ def main(argv: list[str] | None = None) -> int:
                         repeats=args.repeats,
                         provider=args.provider,
                         config=args.config,
+                        progress=progress,
                     )
                 )
 
