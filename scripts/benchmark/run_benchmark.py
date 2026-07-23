@@ -56,6 +56,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from benchmark.manifest import (  # noqa: E402
+    STAGING_DIRNAME,
     BenchmarkEntry,
     Manifest,
     ManifestError,
@@ -78,10 +79,9 @@ from benchmark.scoring import (  # noqa: E402
     warnings_for_row,
 )
 
-# The subdir the harness stages seeds into, inside the wpt checkout. Matches
-# the seed manifest's ``dest``. A marker file records that this run created
-# it, so cleanup never deletes a directory the harness did not make.
-STAGING_DIRNAME = "wpt-gen-bench"
+# Seeds are staged into ``<wpt_dir>/<STAGING_DIRNAME>/``. A marker file
+# records that this run created it, so cleanup never deletes a directory the
+# harness did not make.
 STAGING_MARKER = ".wpt-gen-bench-created"
 
 

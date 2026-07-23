@@ -167,7 +167,6 @@ the cases). Both share `id` and `kind`:
 
 - `seeds[]` — checked-in seed files with gold labels:
   - `seed` — path relative to `benchmarks/seeds/`.
-  - `dest` — subdir created inside the checkout to stage the seed into.
   - `expect[]` — gold labels: finding keys that MUST fire (empty `[]` for a
     known-clean seed).
     - `source_doc` — the finding key today (see below); a path *into the

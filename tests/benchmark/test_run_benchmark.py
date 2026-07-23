@@ -31,6 +31,7 @@ import yaml
 # ``benchmark`` package resolves here.
 from benchmark import run_benchmark
 from benchmark.manifest import (
+    STAGING_DIRNAME,
     ManifestError,
     SeedEntry,
     load_manifest,
@@ -471,7 +472,6 @@ def _valid_manifest_dict() -> dict[str, Any]:
                 "id": "seed-a",
                 "seed": "testharness/foo.worker.js",
                 "kind": "testharness",
-                "dest": "wpt-gen-bench/",
                 "expect": [
                     {
                         "source_doc": "wpt/docs/writing-tests/testharness.md",
@@ -505,14 +505,6 @@ def test_manifest_seed_missing_expect_rejected(tmp_path: Path) -> None:
     del data["seeds"][0]["expect"]
     path = _write_manifest(tmp_path, data)
     with pytest.raises(ManifestError, match='needs an "expect"'):
-        load_manifest(path)
-
-
-def test_manifest_seed_missing_dest_rejected(tmp_path: Path) -> None:
-    data = _valid_manifest_dict()
-    del data["seeds"][0]["dest"]
-    path = _write_manifest(tmp_path, data)
-    with pytest.raises(ManifestError, match='needs a "dest"'):
         load_manifest(path)
 
 
@@ -716,7 +708,6 @@ def _seed_entry(seed: str, kind: str = "testharness") -> SeedEntry:
         entry_id=f"seed-{Path(seed).stem}",
         kind=kind,
         seed=seed,
-        dest="wpt-gen-bench/",
     )
 
 
@@ -727,7 +718,7 @@ def test_stage_seeds_refuses_unmarked_existing_dir(tmp_path: Path) -> None:
     wpt_dir = tmp_path / "wpt"
     wpt_dir.mkdir()
     # A pre-existing, non-harness staging dir must NOT be clobbered.
-    (wpt_dir / run_benchmark.STAGING_DIRNAME).mkdir()
+    (wpt_dir / STAGING_DIRNAME).mkdir()
     with pytest.raises(
         run_benchmark.HarnessError, match="refusing to overwrite"
     ):
@@ -794,7 +785,7 @@ def test_stage_and_unstage_roundtrip(tmp_path: Path) -> None:
 
 def test_unstage_leaves_unmarked_dir_alone(tmp_path: Path) -> None:
     wpt_dir = tmp_path / "wpt"
-    staging = wpt_dir / run_benchmark.STAGING_DIRNAME
+    staging = wpt_dir / STAGING_DIRNAME
     staging.mkdir(parents=True)
     (staging / "real.txt").write_text("x", encoding="utf-8")
     run_benchmark.unstage_seeds(wpt_dir)

@@ -52,7 +52,6 @@ seeds:
   - id: seed-worker-missing-done
     seed: testharness/blob-slice-type.worker.js
     kind: testharness
-    dest: wpt-gen-bench/
     expect:
       # A .worker.js test imports testharness.js and runs tests but never
       # calls done(), which testharness.md requires for worker tests (the
@@ -70,7 +69,6 @@ seeds:
   - id: seed-reftest-ref-same-technique
     seed: reftest/grid-gap-percentage-001.html
     kind: reftest
-    dest: wpt-gen-bench/
     expect:
       # The reference reproduces the test's own grid + percentage row-gap
       # technique, so a shared bug would make both render identically and
@@ -85,5 +83,4 @@ seeds:
   - id: seed-clean-headers-append
     seed: clean/headers-append-basic.html
     kind: testharness
-    dest: wpt-gen-bench/
     expect: []

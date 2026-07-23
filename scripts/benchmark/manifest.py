@@ -35,6 +35,10 @@ class ManifestError(Exception):
     """A manifest that is structurally invalid or inconsistent."""
 
 
+# The single subdir, inside the wpt checkout, that seeds are staged into.
+STAGING_DIRNAME = "wpt-gen-bench"
+
+
 @dataclass
 class BenchmarkEntry:
     """Common to every entry: an id, a test kind, and a locatable test file."""
@@ -68,13 +72,11 @@ class SeedEntry(BenchmarkEntry):
 
     # Path relative to benchmarks/seeds/.
     seed: str
-    # Subdir created inside the checkout to stage the seed into.
-    dest: str
     expect: list[ExpectLabel] = field(default_factory=list)
 
     def test_rel_path(self) -> str:
-        # Staged location: <dest>/<seed-basename>.
-        return f'{self.dest.rstrip("/")}/{Path(self.seed).name}'
+        # Staged flat into the fixed staging dir: <staging>/<seed-basename>.
+        return f"{STAGING_DIRNAME}/{Path(self.seed).name}"
 
 
 @dataclass
@@ -133,10 +135,6 @@ def _parse_seed(raw: dict[str, Any], index: int) -> SeedEntry:
         f'{entry_id}: seed entry needs a "seed" path',
     )
     _require(
-        isinstance(raw.get("dest"), str) and bool(raw.get("dest")),
-        f'{entry_id}: seed entry needs a "dest" subdir',
-    )
-    _require(
         "expect" in raw,
         f'{entry_id}: seed entry needs an "expect" list '
         "(empty [] for a known-clean seed)",
@@ -145,7 +143,6 @@ def _parse_seed(raw: dict[str, Any], index: int) -> SeedEntry:
         entry_id=entry_id,
         kind=kind,
         seed=str(raw["seed"]),
-        dest=str(raw["dest"]),
         expect=parse_expect(raw.get("expect")),
     )
 

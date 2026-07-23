@@ -136,7 +136,7 @@ def _build_findings_payload(
     changed.
     """
     payload: dict[str, Any] = {
-        "test_path": str(test_path),
+        "test_path": test_path.as_posix(),
         "run_metadata": run_metadata,
         "findings": [asdict(f) for f in findings],
         "input_scope": _input_scope_to_payload(input_scope),
