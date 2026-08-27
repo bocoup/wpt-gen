@@ -2279,6 +2279,35 @@ def test_stage_golden_decodes_bytes_to_per_pr_path(tmp_path: Path) -> None:
     assert (wpt_dir / entry.test_rel_path()) == staged
 
 
+def test_stage_golden_stages_captured_reference_from_candidate(
+    tmp_path: Path,
+) -> None:
+    # The harvester captures a reftest's reference (at the test's commit) into
+    # files_b64. Staging writes it straight from the candidate — no checkout
+    # lookup — so the reftest is not mis-flagged for a missing reference.
+    wpt_dir = tmp_path / "wpt"
+    wpt_dir.mkdir()
+    entry = GoldenEntry(
+        entry_id="golden-1-abcd1234",
+        kind="reftest",
+        pr=1,
+        commit_id="abcd1234" + "0" * 32,
+        path="css/t.html",
+        files_b64={
+            "css/t.html": _b64(
+                '<link rel="match" href="reference/t-ref.html">\n<div>x</div>'
+            ),
+            "css/reference/t-ref.html": _b64("<html>ref</html>"),
+        },
+    )
+    run_benchmark.stage_golden(wpt_dir, [entry])
+    pr_root = wpt_dir / STAGING_DIRNAME / GOLDEN_STAGING_SUBDIR / "1"
+    assert (pr_root / "css" / "t.html").is_file()
+    assert (pr_root / "css" / "reference" / "t-ref.html").read_text(
+        encoding="utf-8"
+    ) == "<html>ref</html>"
+
+
 # --- Golden: subset selection -----------------------------------------------
 
 

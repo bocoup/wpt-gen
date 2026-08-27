@@ -27,8 +27,17 @@ scoring unit: fetch these bytes, run the evaluator, check the flagged lines.
 
     python scripts/benchmark/harvest_wpt_prs.py \\
       [--out benchmarks/golden/candidates] \\
-      [--watermark benchmarks/golden/watermark.json] \\
-      [--max-prs 200] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--dry-run]
+      [--max-prs 200] [--since YYYY-MM-DD] [--until YYYY-MM-DD] \\
+      [--pr 49140,47302] [--skip-existing] [--dry-run]
+
+A run harvests exactly the ``--since``/``--until``
+window (or the ``--pr`` set). ``--until``
+is the **dev/holdout boundary guardrail** — it must be at or before the
+earliest training cutoff among the models under test, so a crawl never reaches
+holdout PRs. When maintainers change the oldest model in ``wpt-gen.yml``, the
+boundary moves and the dev/holdout split must be reviewed (see
+``benchmarks/golden/README.md``). ``--pr`` refreshes a known set by number;
+``--skip-existing`` leaves candidates already on disk untouched.
 
 Talks to GitHub through the ``gh`` CLI.
 
@@ -41,6 +50,7 @@ safety net for any that slip through.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -49,6 +59,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from benchmark.golden_references import reference_hrefs, resolve_reference
 
 REPO = "web-platform-tests/wpt"
 
@@ -208,10 +220,18 @@ def snapshot(
 
     blocks: list[dict[str, Any]] = []
     for commit_id, block_comments in by_commit.items():
-        paths = sorted({c["path"] for c in block_comments})
+        commented = sorted({c["path"] for c in block_comments})
+        # Captured reftest references for this commit are keyed on the same
+        # commit_id but are not commented paths; include them so a staged
+        # reftest carries its reference (see _capture_reftest_references).
+        extra = sorted(
+            p
+            for (cid, p), _ in content_at.items()
+            if cid == commit_id and p not in commented
+        )
         test_files = [
             {"path": p, "content_b64": content_at[(commit_id, p)]}
-            for p in paths
+            for p in [*commented, *extra]
             if (commit_id, p) in content_at
         ]
         blocks.append(
@@ -356,6 +376,12 @@ class GitHub:
         data = self._fetch(f"/repos/{REPO}/pulls/{number}")
         return str((data.get("head") or {}).get("sha", ""))
 
+    def pull(self, number: int) -> dict[str, Any]:
+        """The full PR object from the pulls endpoint (merged_at, user,
+        labels, head), for harvesting a specific PR by number."""
+        data = self._fetch(f"/repos/{REPO}/pulls/{number}")
+        return data if isinstance(data, dict) else {}
+
 
 def _normalize_search_item(item: dict[str, Any]) -> dict[str, Any]:
     """Maps a /search/issues item onto the pulls-endpoint shape. `merged_at`
@@ -434,30 +460,28 @@ def build_record(pr: PullRequest, gh: GitHub) -> dict[str, Any]:
             # Changed after review = the flaw was addressed before merge.
             fixed[path] = head_content is not None and reviewed != head_content
 
+    _capture_reftest_references(gh, content_at)
+
     return snapshot(pr, comments, content_at, fixed)
 
 
-# --- Watermark --------------------------------------------------------------
-
-
-def load_watermark(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    try:
-        merged_at = json.loads(path.read_text(encoding="utf-8")).get(
-            "merged_at"
-        )
-        return str(merged_at) if merged_at is not None else None
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def write_watermark(path: Path, merged_at: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"merged_at": merged_at}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+def _capture_reftest_references(
+    gh: GitHub, content_at: dict[tuple[str, str], str]
+) -> None:
+    """Fetches each reftest's ``rel=match|mismatch`` reference at the *same*
+    commit and adds it to ``content_at``.
+    """
+    for (commit_id, path), content_b64 in list(content_at.items()):
+        if not path.endswith((".html", ".xht", ".xhtml")):
+            continue
+        html = base64.b64decode(content_b64).decode("utf-8", "replace")
+        for href in reference_hrefs(html):
+            ref_path = resolve_reference(path, href)
+            if ref_path is None or (commit_id, ref_path) in content_at:
+                continue
+            ref_content = gh.file_at_ref(ref_path, commit_id)
+            if ref_content is not None:
+                content_at[(commit_id, ref_path)] = ref_content
 
 
 def _candidate_file(out_dir: Path, pr_number: int) -> Path:
@@ -467,18 +491,68 @@ def _candidate_file(out_dir: Path, pr_number: int) -> Path:
 # --- Orchestration ----------------------------------------------------------
 
 
+def _emit_candidate(
+    record: dict[str, Any], pr: PullRequest, out_dir: Path, dry_run: bool
+) -> bool:
+    """Writes a candidate record (or reports it under --dry-run). Returns
+    True if it counted (always, once processed)."""
+    if dry_run:
+        blocks = record["reviewed_commits"]
+        n_comments = sum(len(b["comments"]) for b in blocks)
+        print(
+            f"  candidate PR #{pr.number} "
+            f"({n_comments} CHANGES_REQUESTED comment(s) across "
+            f"{len(blocks)} commit(s))",
+            file=sys.stderr,
+        )
+        return True
+    out_file = _candidate_file(out_dir, pr.number)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    out_file.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def harvest_prs(
+    gh: GitHub,
+    out_dir: Path,
+    pr_numbers: list[int],
+    dry_run: bool,
+    skip_existing: bool = False,
+) -> int:
+    """Harvests specific PRs by number and returns the count written.
+
+    A targeted refresh: re-harvest a known set (e.g. the golden PRs) to pick up
+    a harvester change, without re-crawling a whole date window. With
+    ``skip_existing``, PRs already on disk are left untouched — no re-fetch.
+    """
+    count = 0
+    for number in pr_numbers:
+        if skip_existing and _candidate_file(out_dir, number).exists():
+            print(f"  skip PR #{number} (already harvested)", file=sys.stderr)
+            continue
+        raw = gh.pull(number)
+        pr = _to_pull_request(raw, gh)
+        if not qualifies(pr):
+            print(f"  skip PR #{number} (does not qualify)", file=sys.stderr)
+            continue
+        record = build_record(pr, gh)
+        if _emit_candidate(record, pr, out_dir, dry_run):
+            count += 1
+    return count
+
+
 def harvest(
     gh: GitHub,
     out_dir: Path,
-    watermark_path: Path,
     max_prs: int,
     dry_run: bool,
     since_date: str | None = None,
     until_date: str | None = None,
-) -> tuple[int, str | None]:
-    """Returns (candidate_count, newest_merged_at)."""
-    watermark = load_watermark(watermark_path)
-    print(f"watermark: {watermark or '(none)'}", file=sys.stderr, flush=True)
+    skip_existing: bool = False,
+) -> int:
+    """Harvests qualifying PRs in the ``--since``/``--until`` window.
+    Returns the count written.
+    """
     print("harvesting merged PRs...", file=sys.stderr, flush=True)
 
     raw_pulls = gh.merged_pulls(
@@ -492,59 +566,38 @@ def harvest(
             "the window may be incomplete. Raise --max-prs to be sure.",
             file=sys.stderr,
         )
-    newest_seen = watermark
     count = 0
 
     for raw in raw_pulls:
-        merged_at = raw.get("merged_at")
-        if merged_at is None:
+        if raw.get("merged_at") is None:
             continue
-        if watermark is not None and merged_at <= watermark:
-            continue  # already processed in an earlier run
+        number = int(raw["number"])
+        if skip_existing and _candidate_file(out_dir, number).exists():
+            continue  # already harvested; don't re-fetch
 
         try:
             pr = _to_pull_request(raw, gh)
-            if newest_seen is None or (pr.merged_at or "") > newest_seen:
-                newest_seen = pr.merged_at
             if not qualifies(pr):
                 continue
             record = build_record(pr, gh)
         except subprocess.CalledProcessError:
             # gh failed even after retries. Candidates already written are
             # complete (per-PR atomic writes); report where we stopped so the
-            # run can be resumed with --since <last merged_at written>.
+            # run can be narrowed with --since to skip the completed PRs.
             print(
-                f"\n[error] gh API failed on PR #{raw.get('number')} "
-                f"(merged {merged_at}); stopping.\n"
+                f"\n[error] gh API failed on PR #{raw.get('number')}; "
+                f"stopping.\n"
                 f"        {count} candidate(s) written to {out_dir} so far.\n"
-                "        Re-run to continue; already-written candidates are "
-                "complete.",
+                "        Re-run (add --skip-existing) to continue; "
+                "already-written candidates are complete.",
                 file=sys.stderr,
             )
             raise
 
-        count += 1
-        if dry_run:
-            blocks = record["reviewed_commits"]
-            n_comments = sum(len(b["comments"]) for b in blocks)
-            print(
-                f"  candidate PR #{pr.number} "
-                f"({n_comments} CHANGES_REQUESTED comment(s) across "
-                f"{len(blocks)} commit(s))",
-                file=sys.stderr,
-            )
-            continue
+        if _emit_candidate(record, pr, out_dir, dry_run):
+            count += 1
 
-        out_file = _candidate_file(out_dir, pr.number)
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text(
-            json.dumps(record, indent=2) + "\n", encoding="utf-8"
-        )
-
-    if not dry_run and newest_seen and newest_seen != watermark:
-        write_watermark(watermark_path, newest_seen)
-
-    return count, newest_seen
+    return count
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -556,12 +609,6 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path("benchmarks/golden/candidates"),
         help="Directory for <pr>.json candidate snapshots.",
-    )
-    parser.add_argument(
-        "--watermark",
-        type=Path,
-        default=Path("benchmarks/golden/watermark.json"),
-        help="File tracking the last merged_at processed.",
     )
     parser.add_argument(
         "--max-prs",
@@ -580,22 +627,56 @@ def main(argv: list[str] | None = None) -> int:
         help="Only PRs merged on/before this date (YYYY-MM-DD).",
     )
     parser.add_argument(
+        "--pr",
+        default=None,
+        help=(
+            "Harvest specific PRs by number (comma-separated), skipping the "
+            "search crawl. A targeted refresh of a known set (e.g. the golden "
+            "PRs) after a harvester change."
+        ),
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help=(
+            "Skip PRs whose <pr>.json is already in --out (no re-fetch). "
+            "Refreshes only the missing candidates."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Report candidates without writing snapshots or the watermark.",
+        help="Report candidates without writing snapshots.",
     )
     args = parser.parse_args(argv)
 
     try:
-        count, newest = harvest(
-            GitHub(),
-            args.out,
-            args.watermark,
-            args.max_prs,
-            args.dry_run,
-            since_date=args.since,
-            until_date=args.until,
-        )
+        if args.pr:
+            try:
+                pr_numbers = [int(n) for n in args.pr.split(",") if n.strip()]
+            except ValueError:
+                print(
+                    "error: --pr must be comma-separated PR numbers.",
+                    file=sys.stderr,
+                )
+                return 2
+            count = harvest_prs(
+                GitHub(),
+                args.out,
+                pr_numbers,
+                args.dry_run,
+                skip_existing=args.skip_existing,
+            )
+        else:
+            count = harvest(
+                GitHub(),
+                args.out,
+                args.max_prs,
+                args.dry_run,
+                since_date=args.since,
+                until_date=args.until,
+                skip_existing=args.skip_existing,
+            )
     except FileNotFoundError:
         print(
             "error: `gh` CLI not found. Install it or run in an environment "
@@ -613,10 +694,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     verb = "would harvest" if args.dry_run else "harvested"
-    print(
-        f"{verb} {count} candidate(s); newest merged_at {newest}",
-        file=sys.stderr,
-    )
+    print(f"{verb} {count} candidate(s)", file=sys.stderr)
     return 0
 
 

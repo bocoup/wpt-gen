@@ -15,6 +15,7 @@
 """Tests for the golden-PR harvester. No network: the gh I/O layer is
 stubbed with a fake serving fixture payloads."""
 
+import base64
 import json
 import subprocess
 from pathlib import Path
@@ -342,6 +343,111 @@ def test_build_record_derives_fixed_before_merge() -> None:
     assert block["test_files"][0]["content_b64"] == "reviewed"  # @ commit A
 
 
+def test_build_record_captures_reftest_reference_at_commit() -> None:
+    """A reftest's rel=match reference is fetched at the test's own commit and
+    added to the block's test_files."""
+    test_html = base64.b64encode(
+        b'<link rel="match" href="reference/t-ref.html">'
+    ).decode()
+    ref_html = base64.b64encode(b"<html>ref</html>").decode()
+
+    class _Gh(h.GitHub):
+        def file_at_ref(self, path: str, ref: str) -> str | None:
+            if path == "css/t.html":
+                return test_html
+            if path == "css/reference/t-ref.html" and ref == "A":
+                return ref_html
+            return None  # never a head match -> keeps fixed logic simple
+
+    pr = _pr(
+        author="twilco",
+        head_sha="HEAD",
+        review_comments=[
+            {
+                "author": "rev",
+                "path": "css/t.html",
+                "line": 1,
+                "commit_id": "A",
+                "review_id": 1,
+                "html_url": "u",
+                "body": "x",
+            }
+        ],
+        reviews=[{"id": 1, "state": "CHANGES_REQUESTED", "author": "rev"}],
+    )
+    rec = h.build_record(pr, _Gh())
+    files = {
+        tf["path"]: tf["content_b64"]
+        for tf in rec["reviewed_commits"][0]["test_files"]
+    }
+    # The reference is captured alongside the test, at the same commit.
+    assert files["css/t.html"] == test_html
+    assert files["css/reference/t-ref.html"] == ref_html
+
+
+class _PullGitHub(h.GitHub):
+    """A gh fake for the per-PR path: serves one qualifying PR's payloads."""
+
+    def __init__(self) -> None:
+        self._raw = {
+            "number": 42,
+            "merged_at": "2026-07-20T00:00:00Z",
+            "user": {"login": "author"},
+            "labels": [{"name": "dom"}],
+            "head": {"sha": "HEAD"},
+        }
+
+    def pull(self, number: int) -> dict[str, Any]:
+        return {**self._raw, "number": number}
+
+    def files(self, number: int) -> list[dict[str, Any]]:
+        return [{"filename": "dom/nodes/t.html"}]
+
+    def review_comments(self, number: int) -> list[dict[str, Any]]:
+        return [
+            {
+                "user": {"login": "reviewer"},
+                "path": "dom/nodes/t.html",
+                "line": 5,
+                "original_line": 5,
+                "commit_id": "sha1",
+                "original_commit_id": "sha1",
+                "pull_request_review_id": 1,
+                "html_url": "u",
+                "body": "fix this",
+            }
+        ]
+
+    def reviews(self, number: int) -> list[dict[str, Any]]:
+        return [{"id": 1, "state": "CHANGES_REQUESTED", "user": {}}]
+
+    def file_at_ref(self, path: str, ref: str) -> str | None:
+        return "Y29udGVudA=="  # base64("content")
+
+
+def test_harvest_prs_writes_named_pr(tmp_path: Path) -> None:
+    count = h.harvest_prs(_PullGitHub(), tmp_path, [42], dry_run=False)
+    assert count == 1
+    written = json.loads((tmp_path / "42.json").read_text())
+    assert written["pr"] == 42
+
+
+def test_harvest_prs_skip_existing(tmp_path: Path) -> None:
+    (tmp_path / "42.json").write_text('{"pr": 42}\n', encoding="utf-8")
+    count = h.harvest_prs(
+        _PullGitHub(), tmp_path, [42], dry_run=False, skip_existing=True
+    )
+    assert count == 0
+    # The pre-existing file is untouched (not overwritten by a fresh harvest).
+    assert json.loads((tmp_path / "42.json").read_text()) == {"pr": 42}
+
+
+def test_harvest_prs_dry_run_writes_nothing(tmp_path: Path) -> None:
+    count = h.harvest_prs(_PullGitHub(), tmp_path, [42], dry_run=True)
+    assert count == 1
+    assert not (tmp_path / "42.json").exists()
+
+
 # --- date-window qualifier --------------------------------------------------
 
 
@@ -402,22 +508,6 @@ def test_to_pull_request_fetches_head_sha_when_absent() -> None:
     }
     pr = h._to_pull_request(raw, gh)
     assert pr.head_sha == "fetched-sha"
-
-
-# --- watermark --------------------------------------------------------------
-
-
-def test_watermark_roundtrip(tmp_path: Path) -> None:
-    wm = tmp_path / "watermark.json"
-    assert h.load_watermark(wm) is None  # missing file
-    h.write_watermark(wm, "2026-07-20T00:00:00Z")
-    assert h.load_watermark(wm) == "2026-07-20T00:00:00Z"
-
-
-def test_watermark_load_tolerates_garbage(tmp_path: Path) -> None:
-    wm = tmp_path / "watermark.json"
-    wm.write_text("not json", encoding="utf-8")
-    assert h.load_watermark(wm) is None
 
 
 # --- harvest() orchestration (stubbed gh) -----------------------------------
@@ -537,12 +627,10 @@ def test_harvest_writes_qualifying_and_skips_rest(tmp_path: Path) -> None:
     }
     gh = _FakeGitHub(pulls, per_pr)
     out = tmp_path / "candidates"
-    wm = tmp_path / "watermark.json"
 
-    count, newest = h.harvest(gh, out, wm, max_prs=200, dry_run=False)
+    count = h.harvest(gh, out, max_prs=200, dry_run=False)
 
     assert count == 1
-    assert newest == "2026-07-25T00:00:00Z"  # advances across skipped PRs
     # One JSON file per PR; only PR 10 qualifies.
     assert {p.name for p in out.glob("*.json")} == {"10.json"}
     rec = json.loads((out / "10.json").read_text(encoding="utf-8"))
@@ -550,35 +638,34 @@ def test_harvest_writes_qualifying_and_skips_rest(tmp_path: Path) -> None:
     block = rec["reviewed_commits"][0]
     assert block["commit_id"] == "sha1"
     assert block["test_files"][0]["path"] == "dom/nodes/t.html"
-    assert h.load_watermark(wm) == "2026-07-25T00:00:00Z"
 
 
-def test_harvest_respects_watermark(tmp_path: Path) -> None:
-    wm = tmp_path / "watermark.json"
-    h.write_watermark(wm, "2026-07-25T00:00:00Z")
-    pulls = [
-        _raw_pull(10, "2026-07-25T00:00:00Z", "human", ["dom"]),  # == wm, skip
-        _raw_pull(9, "2026-07-24T00:00:00Z", "human", ["dom"]),  # older, skip
-    ]
-    gh = _FakeGitHub(pulls, {10: _cr_pr(10), 9: _cr_pr(9)})
-    count, _ = h.harvest(gh, tmp_path / "c", wm, max_prs=200, dry_run=False)
+def test_harvest_skip_existing_leaves_candidate_untouched(
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "candidates"
+    out.mkdir()
+    (out / "10.json").write_text('{"pr": 10}\n', encoding="utf-8")
+    pulls = [_raw_pull(10, "2026-07-25T00:00:00Z", "human", ["dom"])]
+    gh = _FakeGitHub(pulls, {10: _cr_pr(10)})
+
+    count = h.harvest(gh, out, max_prs=200, dry_run=False, skip_existing=True)
+
     assert count == 0
+    assert json.loads((out / "10.json").read_text()) == {"pr": 10}
 
 
 def test_harvest_dry_run_writes_nothing(tmp_path: Path) -> None:
     pulls = [_raw_pull(10, "2026-07-25T00:00:00Z", "human", ["dom"])]
     out = tmp_path / "candidates"
-    wm = tmp_path / "watermark.json"
-    count, _ = h.harvest(
+    count = h.harvest(
         _FakeGitHub(pulls, {10: _cr_pr(10)}),
         out,
-        wm,
         max_prs=200,
         dry_run=True,
     )
     assert count == 1
     assert not out.exists()
-    assert not wm.exists()  # watermark untouched in dry-run
 
 
 def _capped_pulls(n: int) -> list[dict[str, Any]]:
@@ -604,13 +691,12 @@ def test_harvest_reports_where_it_stopped_on_fatal(
         h.harvest(
             _BoomGitHub(pulls, {10: _cr_pr(10)}),
             tmp_path / "c",
-            tmp_path / "w",
             max_prs=200,
             dry_run=False,
         )
     err = capsys.readouterr().err
-    assert "PR #10" in err
-    assert "2024-12-05" in err  # where it stopped
+    assert "PR #10" in err  # names where it stopped
+    assert "skip-existing" in err  # tells the maintainer how to resume
 
 
 def test_harvest_warns_when_window_hits_max_prs(
@@ -619,7 +705,6 @@ def test_harvest_warns_when_window_hits_max_prs(
     h.harvest(
         _FakeGitHub(_capped_pulls(3), {}),
         tmp_path / "c",
-        tmp_path / "w",
         max_prs=3,
         dry_run=True,
         since_date="2024-10-01",
@@ -635,7 +720,6 @@ def test_harvest_no_warn_without_window(
     h.harvest(
         _FakeGitHub(_capped_pulls(3), {}),
         tmp_path / "c",
-        tmp_path / "w",
         max_prs=3,
         dry_run=True,
     )

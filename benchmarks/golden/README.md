@@ -14,7 +14,6 @@ evaluator, and scores its findings against the reviewer's.
 golden/
   candidates/     # <pr>.json — machine snapshots (harvested, public-safe)
   annotated/      # <pr>.yaml — the answer key (human-verified)
-  watermark.json  # harvest cursor: newest merged_at already processed
 ```
 
 - **`ANNOTATION.md`** — the annotation skill (how a candidate becomes an answer key).
@@ -25,19 +24,35 @@ golden/
 
 ### 1. Harvest candidates
 
-`harvest_wpt_prs.py` walks recently merged WPT PRs and snapshots the ones with
-substantive review — a `CHANGES_REQUESTED` comment left by a reviewer (not the
-author) on a test file. It writes one `candidates/<pr>.json` per qualifying PR
-and advances `watermark.json` so the next run resumes where it left off.
+`harvest_wpt_prs.py` walks merged WPT PRs in a date window and snapshots the
+ones with substantive review — a `CHANGES_REQUESTED` comment left by a reviewer
+(not the author) on a test file. It writes one `candidates/<pr>.json` per
+qualifying PR.
+
+There is **no resume cursor**: a run harvests exactly the `--since`/`--until`
+window you give it (or a `--pr` set). What has already been harvested is the set
+of `candidates/*.json` on disk — `--skip-existing` leaves those untouched. This
+keeps the dev/holdout boundary explicit: the window you pass *is* the decision,
+not a cursor that silently creeps forward past it.
 
 ```bash
 # Preview what would be harvested — writes nothing:
 python scripts/benchmark/harvest_wpt_prs.py --dry-run
 
-# Harvest a specific past window (bounded so it can't run away):
+# Extend the dev set: harvest new PRs up to the boundary. --until MUST be
+# <= the current dev/holdout boundary (see the model-cutoff table below);
+# --skip-existing leaves already-committed candidates untouched.
 python scripts/benchmark/harvest_wpt_prs.py \
-  --since 2024-06-01 --until 2024-09-30 --max-prs 400
+  --since 2024-12-13 --until <boundary> --max-prs 400 --skip-existing
+
+# Refresh a known set (e.g. after a harvester change) without re-crawling:
+python scripts/benchmark/harvest_wpt_prs.py --pr 47302,46734
 ```
+
+**Every harvest is a logged step.** Before running, confirm `--until` is at or
+before the current boundary in the [model-cutoff table](#model--training-cutoff);
+after running, append a row to the [harvest log](#harvest-log). The `--until`
+guardrail is what keeps a crawl from reaching into the holdout window.
 
 Each candidate records, per reviewed commit: the commented test file's bytes
 **at the review commit** (base64), and each comment's author, path, line, and
@@ -133,6 +148,48 @@ How maintainers should *store and share* holdout annotations privately is
 deliberately left open — that's a policy decision for maintainers to settle
 once the overall approach is agreed. The only firm rule is the boundary:
 holdout answer keys do not land in this repo.
+
+## The boundary is a decision, not a date — model cutoffs & harvest log
+
+The dev/holdout boundary is **the earliest training cutoff among the models
+under test** (`wpt-gen.yml`). It is *not* a fixed date and *not* the newest
+model's cutoff — it moves only as far forward as the **oldest** model allows.
+
+**Standing decision: cutoffs are deliberately staggered.** We keep at least one
+older-cutoff model under test on purpose, to hold the boundary back and
+preserve a large holdout window. Adding newer models is fine; the boundary does
+not move as long as an older-cutoff model remains. This is worth doing while
+there is no holdout-benchmark process yet — a large holdout is runway we cannot
+yet spend, so we protect it.
+
+**Consequence — treat the oldest model as load-bearing.** Removing it, or
+bumping it to a later cutoff, moves the boundary forward and **permanently
+contaminates** every holdout PR that crosses it (a model, once trained on a PR,
+cannot un-see it). So changing the oldest model is a boundary decision logged
+below, never a routine config edit.
+
+### Model → training cutoff
+
+Fill from each provider's authoritative documentation; do not guess. The
+**minimum** of this column is the current boundary. (Dates are `YYYY-MM`.)
+
+| provider  | model              | training cutoff |
+| :-------- | :----------------- | :-------------- |
+| gemini    | gemini-3.7-flash   | `TODO`          |
+| anthropic | claude-opus-4-6    | `TODO`          |
+| openai    | gpt-5.4            | `TODO`          |
+
+**Current boundary (min cutoff): `TODO` — set from the table above.**
+
+### Harvest log
+
+One row per harvest run, appended. It records the boundary the run was
+authorized under, so any committed candidate can be traced to the cutoff that
+made it dev-window-safe. A run's `--until` must be `<=` the boundary in force.
+
+| date run   | `--since` | `--until` | boundary at run | PRs added | notes                    |
+| :--------- | :-------- | :-------- | :-------------- | :-------- | :----------------------- |
+| 2024-??-?? | (initial) | (initial) | `TODO`          | 10        | initial dev set, Jul–Dec 2024 |
 
 ---
 

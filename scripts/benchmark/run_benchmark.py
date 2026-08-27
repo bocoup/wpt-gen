@@ -183,15 +183,15 @@ def stage_golden(wpt_dir: Path, entries: list[GoldenEntry]) -> Path:
     """Decodes each golden entry's test bytes into the staging root.
 
     All of the chosen commit block's ``files_b64`` are written (so a test's
-    same-commit siblings are present), under
-    ``<staging>/golden/<pr>/<path>``. Returns the staging dir.
+    same-commit siblings — including reftest references the harvester captured
+    at that commit — are present), under ``<staging>/golden/<pr>/<path>``.
+    Returns the staging dir.
     """
     staging = _ensure_staging(wpt_dir)
     for entry in entries:
+        pr_root = staging / GOLDEN_STAGING_SUBDIR / str(entry.pr)
         for rel_path, content_b64 in entry.files_b64.items():
-            dest_abs = (
-                staging / GOLDEN_STAGING_SUBDIR / str(entry.pr) / rel_path
-            )
+            dest_abs = pr_root / rel_path
             dest_abs.parent.mkdir(parents=True, exist_ok=True)
             dest_abs.write_bytes(base64.b64decode(content_b64))
     return staging
