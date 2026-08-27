@@ -13,6 +13,12 @@
 # limitations under the License.
 
 version: "1"
+
+# The evaluator's release version. Bump this whenever anything that can change
+# benchmark numbers changes: the skill/rules, the manifest or seed/test files,
+# the model config below, or the pinned wpt commit in the manifest. 
+evaluator_version: "0.3.0"
+
 default_provider: gemini
 wpt_path: ../wpt
 providers:

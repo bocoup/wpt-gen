@@ -101,6 +101,37 @@ own repeat-aware target (`warn_at`), so the bar matches the ✅/⚠️/❌ statu
 summary already shows and tightens automatically with more repeats (≈0.61 at 3
 reps, ≈0.72 at 8).
 
+### Versioning & provenance
+
+The evaluator carries **one** human-facing version: `evaluator_version` in
+`wpt-gen.yml`. Bump it whenever anything that can change the numbers changes,
+which is also the signal to run a full release-tier benchmark:
+
+- the skill or rules (`SKILL.md`, `references/rules.yaml`),
+- the manifest or any seed/test file,
+- the model config in `wpt-gen.yml`,
+- the pinned wpt commit (`wpt_upstream_commit`).
+
+That version is *intent*. Alongside it, the harness computes a content
+**fingerprint** at run time and stamps both into every report header:
+
+```
+- **Evaluator**: `0.3.0` (fingerprint `d8443362ae10` · rules `eea34a7447c2` · labels `83c6b4fe92e2`)
+```
+
+The fingerprint is *truth* — a SHA-256 over the actual inputs (rules + skill,
+manifest + seeds, resolved model, pinned commit). Two runs that share an
+`evaluator_version` but differ in fingerprint mean someone edited an input and
+forgot to bump. It splits into two sub-hashes:
+
+- **`rules`** — `rules.yaml` + `SKILL.md` (the evaluator's judgment).
+- **`labels`** — `manifest.yaml` + every seed file (the ground truth the
+  `expect` labels are authored against).
+
+A report whose `rules` sub-hash changed while `labels` did not is the signal to
+**re-review the seed `expect` labels** against the sharpened rules — the job the
+old manifest `rules_version` field tracked by hand.
+
 ## Reading a benchmark report
 
 Each run writes `report.md` (this section is what it links to) and an
@@ -363,11 +394,6 @@ still resolves.
   in every seed file. Lets responsible training pipelines filter this
   benchmark out.
 - `version` — manifest schema version.
-- `rules_version` — the `rules.yaml` corpus version the `expect` labels were
-  authored against (currently `0.2.0`). The staleness tripwire for the
-  labels: re-review the seeds when `rules.yaml` bumps its version. (An
-  automatic harness cross-check against `rules.yaml`'s own version is not yet
-  implemented.)
 - `wpt_upstream_commit` — the checkout corpus entries are pinned to. Corpus
   files must be byte-identical across runs or consistency numbers are not
   comparable. The harness warns (not fails) on mismatch and records the

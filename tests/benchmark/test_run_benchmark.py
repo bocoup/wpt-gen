@@ -711,7 +711,6 @@ def _write_manifest(tmp_path: Path, data: dict[str, Any]) -> Path:
 def _valid_manifest_dict() -> dict[str, Any]:
     return {
         "version": 1,
-        "rules_version": None,
         "wpt_upstream_commit": "abc123",
         "canary": "guid",
         "corpus": [

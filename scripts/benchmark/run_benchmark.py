@@ -93,6 +93,7 @@ from benchmark.scoring import (  # noqa: E402
     score_seed,
     warnings_for_row,
 )
+from benchmark.provenance import compute_provenance  # noqa: E402
 
 # Seeds are staged into ``<wpt_dir>/<STAGING_DIRNAME>/``. A marker file
 # records that this run created it, so cleanup never deletes a directory the
@@ -488,6 +489,7 @@ class BenchmarkReport:
     quality_gate_failures: tuple[str, ...] = ()
     repo_commit_sha: str | None = None
     categories: dict[str, str] | None = None
+    provenance: dict[str, Any] | None = None
 
 
 class EntryRole(StrEnum):
@@ -899,11 +901,18 @@ def build_report(
     thresholds: QualityThresholds | None = None,
     quality_gate_failures: list[str] | tuple[str, ...] | None = None,
     repo_commit_sha: str | None = None,
+    evaluator_version: str = "unknown",
 ) -> BenchmarkReport:
     provider, model, categories = _resolve_run_model(models)
     thresholds_dict = asdict(thresholds) if thresholds else None
     failures = tuple(quality_gate_failures) if quality_gate_failures else ()
     commit_sha = repo_commit_sha or _resolve_repo_commit()
+    provenance = compute_provenance(
+        manifest_path=manifest.source_path,
+        model=f"{provider or 'unknown'}/{model or 'unknown'}",
+        wpt_commit=manifest.wpt_upstream_commit,
+        evaluator_version=evaluator_version,
+    )
     return BenchmarkReport(
         manifest=str(manifest.source_path),
         provider=provider,
@@ -919,6 +928,7 @@ def build_report(
         quality_thresholds=thresholds_dict,
         quality_gate_failures=failures,
         repo_commit_sha=commit_sha,
+        provenance=asdict(provenance),
     )
 
 
@@ -1605,6 +1615,14 @@ def render_report_markdown(report: BenchmarkReport) -> str:
         f"- **Scope**: {counts[EntryRole.SEED]} seed, {counts[EntryRole.GOLDEN]} golden,"
         f" {counts[EntryRole.CORPUS]} corpus"
     )
+    prov = report.provenance
+    if prov:
+        lines.append(
+            f"- **Evaluator**: `{prov.get('evaluator_version', 'unknown')}` "
+            f"(fingerprint `{str(prov.get('fingerprint', ''))[:12]}` · "
+            f"rules `{str(prov.get('rules_digest', ''))[:12]}` · "
+            f"labels `{str(prov.get('labels_digest', ''))[:12]}`)"
+        )
     if report.repo_commit_sha:
         sha = report.repo_commit_sha
         short_sha = sha[:7]
@@ -1851,6 +1869,18 @@ def resolve_model(
     )
     model = categories.get(chosen)
     return str(model) if model else None
+
+
+def evaluator_version_from_config(config_path: Path) -> str:
+    """Reads ``evaluator_version`` from the config; ``"unknown"`` if absent."""
+    try:
+        raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return "unknown"
+    if not isinstance(raw, dict):
+        return "unknown"
+    version = raw.get("evaluator_version")
+    return str(version) if version is not None else "unknown"
 
 
 # The evaluator skill whose curated reading list is the source of truth for
@@ -2241,6 +2271,7 @@ def main(argv: list[str] | None = None) -> int:
         actual_commit=actual_commit,
         thresholds=thresholds,
         quality_gate_failures=failures,
+        evaluator_version=evaluator_version_from_config(args.config),
     )
     write_reports(args.out, report)
     sys.stderr.write(f'wrote {args.out / "report.md"}\n')

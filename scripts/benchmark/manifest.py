@@ -141,7 +141,6 @@ class Manifest:
     """A parsed, validated benchmark manifest."""
 
     version: int
-    rules_version: str | None
     wpt_upstream_commit: str | None
     canary: str | None
     corpus: list[CorpusEntry]
@@ -269,11 +268,6 @@ def load_manifest(path: Path) -> Manifest:
 
     return Manifest(
         version=int(version),
-        rules_version=(
-            str(raw["rules_version"])
-            if raw.get("rules_version") is not None
-            else None
-        ),
         wpt_upstream_commit=(
             str(raw["wpt_upstream_commit"])
             if raw.get("wpt_upstream_commit") is not None
